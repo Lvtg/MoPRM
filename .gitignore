@@ -11,7 +11,10 @@ venv/
 data/raw/
 data/cache/
 data/candidates/
+data/generated/
+data/prepared/
 data/scored/
+data/splits/
 experiments/results/
 experiments/runs/
 checkpoints/

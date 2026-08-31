@@ -33,6 +33,15 @@ To label candidate correctness for evaluation-only use:
 python scripts/label_candidate_correctness.py --input examples/smoke_moprm.jsonl --output data/cache/smoke_labeled.jsonl
 ```
 
+Prepare the first public math+logic subsets:
+
+```bash
+python scripts/prepare_public_subsets.py --math500-limit 80 --gsm8k-limit 80 --bbh-limit-per-task 60
+python scripts/inspect_dataset.py --input data/cache/public_subsets/math_logic_combined.jsonl
+```
+
+Prepared public data is written under `data/cache/` and is intentionally ignored by git.
+
 ## Relation to Earlier Work
 
 Earlier notes in this repo focus on **Beyond the First Error: Process Reward Models for Reflective Mathematical Reasoning**. That paper remains useful as motivation: it shows that different reasoning styles need different process supervision signals. In MoPRM, reflective PRM scoring can be treated as one expert among several, instead of the whole project scope.
