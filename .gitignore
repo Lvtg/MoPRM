@@ -1,0 +1,39 @@
+# Python/cache artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Experiment artifacts
+data/raw/
+data/cache/
+data/candidates/
+data/scored/
+experiments/results/
+experiments/runs/
+checkpoints/
+models/
+wandb/
+
+# Generated/intermediate files
+local_archive/
+tmp/
+output/
+*.png
+*.jpg
+*.jpeg
+*.pdf
+
+# Keep source documents/notes/code tracked, but not rendered assets or papers.
+!README.md
+!notes/**/*.md
+!tools/**/*.py
+!slides_part1.tex
+
+# Local secrets
+.env
+*.key
+*.token
