@@ -18,6 +18,21 @@ Recommended 15-day scope:
 
 The current experiment plan is in [notes/moprm_15_day_experiment_plan.md](notes/moprm_15_day_experiment_plan.md).
 
+## Local Smoke Test
+
+Run the toy evaluation without downloading models or datasets:
+
+```bash
+python -m unittest discover -s tests
+python scripts/run_smoke_eval.py
+```
+
+To label candidate correctness for evaluation-only use:
+
+```bash
+python scripts/label_candidate_correctness.py --input examples/smoke_moprm.jsonl --output data/cache/smoke_labeled.jsonl
+```
+
 ## Relation to Earlier Work
 
 Earlier notes in this repo focus on **Beyond the First Error: Process Reward Models for Reflective Mathematical Reasoning**. That paper remains useful as motivation: it shows that different reasoning styles need different process supervision signals. In MoPRM, reflective PRM scoring can be treated as one expert among several, instead of the whole project scope.
@@ -25,4 +40,3 @@ Earlier notes in this repo focus on **Beyond the First Error: Process Reward Mod
 ## Git Policy
 
 Important source code, experiment configs, notes, and result summaries should be committed regularly. Large datasets, model weights, generated candidates, scored caches, rendered PDFs, and temporary images should stay out of git.
-

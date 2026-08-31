@@ -54,7 +54,9 @@ Recommended experts:
 | Math PRM | Strong on mathematical step correctness | High | Example: Qwen2.5-Math-PRM, Math-Shepherd-style PRM, Skywork PRM if runnable |
 | Reflective PRM or BFE-style judge | Strong on self-correction / reflective traces | High | Can be an LLM judge using Error Propagation / Error Cessation rules if the original model is unavailable |
 | General LLM judge | Broad but slower baseline expert | Medium | Useful for logic and mixed-domain reasoning |
-| Rule-based / execution verifier | High precision final-answer verifier | Medium | Exact match for math, unit tests for code, option match for multiple-choice logic |
+| Non-leaking verifier | High precision checks that do not use hidden gold answers | Medium | Format, consistency, symbolic constraints, public code tests, or other checks available at selection time |
+
+Gold-answer exact matching is for **evaluation and oracle-label construction only**. It should not be used as a normal scoring expert for math or logic, otherwise the experiment leaks the benchmark answer into the selector. Execution-based code verification is only a normal expert when the tests are genuinely available at selection time.
 | MC-style/recoverability expert | Future solvability signal | Optional | Can use an existing MC-style PRM if runnable; avoid expensive rollouts in the first version |
 
 Important calibration issue:
@@ -116,7 +118,7 @@ Experts:
 1. Math PRM
 2. Reflective reasoning PRM
 3. General LLM judge
-4. Rule-based verifier
+4. Non-leaking verifier
 
 Return JSON weights that sum to 1.
 ```
@@ -146,7 +148,7 @@ Target example:
 Math PRM selected correct answer: yes
 Reflective PRM selected correct answer: no
 General judge selected correct answer: yes
-Rule verifier selected correct answer: no
+Non-leaking verifier selected correct answer: no
 
 target gate distribution = [0.5, 0.0, 0.5, 0.0]
 ```
@@ -225,7 +227,7 @@ src/
   scoring/
     score_math_prm.py
     score_general_judge.py
-    score_rule_verifier.py
+    score_nonleaking_verifier.py
     normalize_scores.py
   routing/
     build_oracle_labels.py
@@ -262,13 +264,13 @@ Data record schema:
         "math_prm": 0.82,
         "reflective_prm": 0.76,
         "general_judge": 0.69,
-        "rule_verifier": 1.0
+        "nonleaking_verifier": 0.74
       },
       "normalized_scores": {
         "math_prm": 0.91,
         "reflective_prm": 0.83,
         "general_judge": 0.75,
-        "rule_verifier": 1.0
+        "nonleaking_verifier": 0.74
       }
     }
   ]
@@ -337,7 +339,7 @@ Deliverables:
 Goals:
 
 - integrate the easiest two experts first;
-- likely choices: math PRM + rule-based verifier or general judge;
+- likely choices: math PRM + general judge;
 - run scoring on a 30-problem smoke test.
 
 Deliverables:
@@ -541,7 +543,7 @@ For a 15-day course project, the strongest manageable version is:
 ```text
 MoPRM with:
 - 2 domains: math + logic
-- 3 experts: math PRM, reflective/general judge, rule/exact verifier
+- 3 experts: math PRM, reflective/general judge, and a non-leaking verifier if available
 - question-level trained gate
 - LLM gate baseline
 - rank-normalized score fusion
@@ -583,4 +585,3 @@ Existing reward routing and MoE reward-modeling work means we should position th
 - RouteLLM: Learning to Route LLMs with Preference Data.
 - LASeR: reward model selection/routing with multi-armed bandits.
 - DMoERM: Mixture-of-Experts Reward Modeling.
-

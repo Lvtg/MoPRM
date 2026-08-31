@@ -38,7 +38,9 @@ Recommended expert pool:
 |---|---|---|
 | Math PRM | Try an open-source PRM if local hardware allows | Candidate options include Qwen2.5-Math-PRM, Math-Shepherd-style PRM, or Skywork PRM. |
 | Reflective/general judge | LLM-as-judge | Can reuse rules inspired by Beyond the First Error. |
-| Rule-based verifier | Local scripts | Exact match for math/logic final answers; unit tests for code if used. |
+| Non-leaking verifier | Local scripts | Use only checks available at selection time, such as format, consistency, public code tests, or symbolic constraints. |
+
+Gold-answer exact matching is used for evaluation and oracle-label construction only. It must not be treated as a normal expert for math or logic, because that would leak the benchmark answer into selection.
 | MC-style expert | Optional | Prefer an existing MC-style PRM over doing expensive rollouts. |
 
 For the gate:
@@ -77,4 +79,3 @@ After the first baseline table:
 
 - add one more expert only if it creates clear complementarity;
 - expand from `N=8` to `N=16` only if scoring cost is under control.
-
