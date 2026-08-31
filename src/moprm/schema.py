@@ -13,6 +13,7 @@ class Candidate:
     steps: list[str] = field(default_factory=list)
     expert_scores: dict[str, float] = field(default_factory=dict)
     normalized_scores: dict[str, float] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Candidate":
@@ -26,7 +27,20 @@ class Candidate:
             normalized_scores={
                 k: float(v) for k, v in data.get("normalized_scores", {}).items()
             },
+            metadata=dict(data.get("metadata", {})),
         )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "candidate_id": self.candidate_id,
+            "solution": self.solution,
+            "final_answer": self.final_answer,
+            "is_correct": self.is_correct,
+            "steps": self.steps,
+            "expert_scores": self.expert_scores,
+            "normalized_scores": self.normalized_scores,
+            "metadata": self.metadata,
+        }
 
 
 @dataclass(frozen=True)
@@ -56,3 +70,12 @@ class ProblemRecord:
             names.update(candidate.normalized_scores)
         return sorted(names)
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "problem_id": self.problem_id,
+            "domain": self.domain,
+            "problem": self.problem,
+            "answer": self.answer,
+            "candidates": [candidate.to_dict() for candidate in self.candidates],
+            "metadata": self.metadata,
+        }

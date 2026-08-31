@@ -35,6 +35,7 @@ def attach_normalized_scores(record: ProblemRecord, method: str = "rank") -> Pro
             steps=candidate.steps,
             expert_scores=candidate.expert_scores,
             normalized_scores=normalized.get(candidate.candidate_id, {}),
+            metadata=candidate.metadata,
         )
         for candidate in record.candidates
     ]
@@ -118,3 +119,6 @@ def default_baselines(records: list[ProblemRecord], normalization: str = "rank")
         results.append(evaluate_records(records, f"single:{expert}", single_expert_gate(expert), normalization))
     return results
 
+
+def filter_by_domain(records: list[ProblemRecord], domain: str) -> list[ProblemRecord]:
+    return [record for record in records if record.domain == domain]

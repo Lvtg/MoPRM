@@ -10,6 +10,9 @@ _CHOICE_RE = re.compile(
     flags=re.IGNORECASE,
 )
 _ANY_CHOICE_RE = re.compile(r"(?<![A-Z])([A-E])(?![A-Z])", flags=re.IGNORECASE)
+_LATEX_TEXT_RE = re.compile(r"\\text\{([^{}]*)\}")
+_LATEX_FRAC_RE = re.compile(r"\\(?:d?frac)\{([^{}]+)\}\{([^{}]+)\}")
+_LATEX_SQRT_RE = re.compile(r"\\sqrt\{([^{}]+)\}")
 
 
 def strip_boxed(text: str) -> str:
@@ -62,20 +65,45 @@ def extract_final_answer(text: str) -> str:
     return text.strip()
 
 
+def normalize_latex(answer: str) -> str:
+    value = str(answer)
+    value = strip_boxed(value)
+    value = _LATEX_TEXT_RE.sub(r"\1", value)
+
+    previous = None
+    while previous != value:
+        previous = value
+        value = _LATEX_FRAC_RE.sub(r"\1/\2", value)
+        value = _LATEX_SQRT_RE.sub(r"sqrt(\1)", value)
+
+    replacements = {
+        "\\left": "",
+        "\\right": "",
+        "\\,": "",
+        "\\!": "",
+        "\\;": "",
+        "\\:": "",
+        "\\cdot": "*",
+        "\\times": "*",
+        "\\pi": "pi",
+        "^\\circ": "",
+        "^{\\circ}": "",
+        "\\circ": "",
+    }
+    for old, new in replacements.items():
+        value = value.replace(old, new)
+    return value
+
+
 def normalize_answer(answer: str) -> str:
-    value = strip_boxed(str(answer))
+    value = normalize_latex(str(answer))
     value = value.strip().lower()
     value = value.replace("$", "")
-    value = value.replace("\\left", "").replace("\\right", "")
-    value = value.replace("\\,", "").replace("\\!", "")
-    value = value.replace("\\cdot", "*")
-    value = value.replace("\\times", "*")
-    value = value.replace("\\frac", "frac")
-    value = value.replace(",", "")
+    value = re.sub(r"(?<=\d),(?=\d{3}\b)", "", value)
     value = value.strip()
     value = re.sub(r"^(?:the\s+)?answer\s+(?:is|:)\s*", "", value)
     value = re.sub(r"^(?:option|choice)\s+", "", value)
-    value = value.strip(" .;:\n\t()[]{}")
+    value = value.strip(" .;:\n\t[]{}")
     value = re.sub(r"\s+", "", value)
     return value
 
@@ -85,12 +113,15 @@ def parse_numeric(answer: str) -> float | None:
     if not normalized:
         return None
     normalized = normalized.replace("%", "/100")
-    frac_match = re.fullmatch(r"([-+]?\d+)/(\d+)", normalized)
+    if normalized.startswith("(") and normalized.endswith(")") and normalized.count("(") == 1:
+        normalized = normalized[1:-1]
+    frac_match = re.fullmatch(r"([-+]?\d+(?:\.\d+)?)/(\d+(?:\.\d+)?)", normalized)
     if frac_match:
-        denominator = int(frac_match.group(2))
+        numerator = Fraction(frac_match.group(1))
+        denominator = Fraction(frac_match.group(2))
         if denominator == 0:
             return None
-        return float(Fraction(int(frac_match.group(1)), denominator))
+        return float(numerator / denominator)
     try:
         return float(normalized)
     except ValueError:
@@ -112,4 +143,3 @@ def check_answer(prediction: str, gold: str, domain: str | None = None, tol: flo
         return math.isclose(pred_num, gold_num, rel_tol=tol, abs_tol=tol)
 
     return normalize_answer(pred_text) == normalize_answer(gold_text)
-

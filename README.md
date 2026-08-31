@@ -38,9 +38,19 @@ Prepare the first public math+logic subsets:
 ```bash
 python scripts/prepare_public_subsets.py --math500-limit 80 --gsm8k-limit 80 --bbh-limit-per-task 60
 python scripts/inspect_dataset.py --input data/cache/public_subsets/math_logic_combined.jsonl
+python scripts/sample_dataset.py --input data/cache/public_subsets/math_logic_combined.jsonl --output data/splits/dev_40.jsonl --per-domain 20 --seed 13
 ```
 
 Prepared public data is written under `data/cache/` and is intentionally ignored by git.
+
+Generate gold-derived debug candidates for end-to-end pipeline testing only:
+
+```bash
+python scripts/generate_debug_candidates.py --input data/splits/dev_40.jsonl --output data/candidates/debug_math_logic.jsonl --num-candidates 4
+python scripts/label_candidate_correctness.py --input data/candidates/debug_math_logic.jsonl --output data/cache/debug_math_logic_labeled.jsonl --overwrite
+python scripts/score_debug_experts.py --input data/cache/debug_math_logic_labeled.jsonl --output data/scored/debug_math_logic_scored.jsonl
+python scripts/run_smoke_eval.py --input data/scored/debug_math_logic_scored.jsonl
+```
 
 ## Relation to Earlier Work
 
