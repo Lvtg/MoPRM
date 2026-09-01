@@ -191,3 +191,63 @@ Next immediate stage: integrate one open-source math PRM.
 Second stage: integrate one non-OpenAI logic/reasoning reward model or PRM.
 Only then train/evaluate the main gate against heterogeneous expert scores.
 ```
+
+## 2026-09-01: Skywork Math PRM Adapter
+
+Hardware check:
+
+```text
+GPU: NVIDIA GeForce RTX 5070 Laptop
+VRAM: 8,151 MiB
+RAM: about 31.4 GiB
+Python: 3.10.10
+```
+
+Selected first open-source math PRM:
+
+```text
+Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B
+```
+
+Rationale:
+
+```text
+The model is a real non-OpenAI math PRM and its main weight file is about 3.09 GB,
+making it much more suitable for the local 8GB GPU than 7B/8B PRMs.
+```
+
+Implementation added:
+
+```text
+src/moprm/scoring/skywork_math_prm.py
+scripts/score_skywork_math_prm.py
+tests/test_skywork_math_prm.py
+notes/open_source_prm_selection.md
+```
+
+Dry-run result:
+
+```text
+python scripts/score_skywork_math_prm.py --input data/cache/openai_pilot10_n4_labeled.jsonl --domains math --limit 3 --dry-run
+records: 1 math record from first 3 pilot records
+candidates: 4
+step splitting worked
+```
+
+Environment note:
+
+```text
+.venv installed CPU torch + transformers + accelerate.
+CUDA torch 12.8 was available from the PyTorch wheel index, but the 2.75GB wheel
+download was repeatedly interrupted and projected to take over an hour, so it was
+paused.
+```
+
+Attempted one-record Skywork PRM smoke:
+
+```text
+command: .\.venv\Scripts\python.exe scripts\score_skywork_math_prm.py --input data\cache\openai_pilot10_n4_labeled.jsonl --output data\scored\skywork_math_prm_pilot1.jsonl --domains math --limit 1 --device auto --overwrite
+result: small config/tokenizer/custom-code files downloaded successfully
+issue: 3.09GB model weight download did not progress beyond small cache files
+action: interrupted the run and kept the adapter ready for the next download attempt
+```

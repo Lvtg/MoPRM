@@ -4,6 +4,14 @@ version = "0.1.0"
 description = "Router-guided mixtures of process reward models for reasoning tasks."
 requires-python = ">=3.10"
 
+[project.optional-dependencies]
+local-prm = [
+    "accelerate",
+    "safetensors",
+    "sentencepiece",
+    "torch",
+    "transformers",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
-

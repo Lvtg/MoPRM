@@ -82,6 +82,20 @@ Day 3-6:
 - candidate solution data or a generation API path;
 - OpenAI general/reflective judge baseline.
 
+Current selected first math PRM:
+
+```text
+Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B
+```
+
+Local setup status:
+
+```text
+.venv has CPU torch + transformers + accelerate installed.
+CUDA torch is preferred for real runs on the RTX 5070 Laptop GPU, but the CUDA
+wheel download is large and should be retried when network conditions are better.
+```
+
 Day 7-9:
 
 - one runnable non-OpenAI logic/reasoning PRM or reward model;

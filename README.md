@@ -101,6 +101,27 @@ python scripts/route_openai_gate.py --input data/scored/openai_dev_smoke_scored.
 python scripts/run_smoke_eval.py --input data/scored/openai_dev_smoke_routed.jsonl --by-domain
 ```
 
+Score math candidates with the first non-OpenAI open-source PRM adapter:
+
+```bash
+python scripts/score_skywork_math_prm.py --input data/cache/openai_pilot10_n4_labeled.jsonl --output data/scored/skywork_math_prm_pilot.jsonl --domains math --limit 10 --device auto --overwrite
+```
+
+The first selected math PRM is `Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B`; selection notes are in [notes/open_source_prm_selection.md](notes/open_source_prm_selection.md).
+
+For local PRM inference, install optional dependencies into the ignored `.venv`:
+
+```bash
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e ".[local-prm]"
+```
+
+Dry-run the adapter before downloading model weights:
+
+```bash
+python scripts/score_skywork_math_prm.py --input data/cache/openai_pilot10_n4_labeled.jsonl --domains math --limit 3 --dry-run
+```
+
 ## Relation to Earlier Work
 
 Earlier notes in this repo focus on **Beyond the First Error: Process Reward Models for Reflective Mathematical Reasoning**. That paper remains useful as motivation: it shows that different reasoning styles need different process supervision signals. In MoPRM, reflective PRM scoring can be treated as one expert among several, instead of the whole project scope.
