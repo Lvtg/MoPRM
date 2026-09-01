@@ -5,7 +5,13 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from moprm.answer_checking import check_answer, normalize_answer, strip_boxed
+from moprm.answer_checking import (
+    check_answer,
+    extract_final_answer,
+    has_explicit_final_answer,
+    normalize_answer,
+    strip_boxed,
+)
 
 
 class AnswerCheckingTest(unittest.TestCase):
@@ -16,6 +22,18 @@ class AnswerCheckingTest(unittest.TestCase):
     def test_choice_answer(self) -> None:
         self.assertTrue(check_answer("Final answer: C", "C", domain="logic"))
         self.assertFalse(check_answer("Final answer: B", "C", domain="logic"))
+
+    def test_extracts_last_final_answer_line(self) -> None:
+        text = (
+            "The answer is (E) because the green book is second.\n\n"
+            "Final answer: E"
+        )
+        self.assertEqual(extract_final_answer(text), "E")
+
+    def test_detects_missing_explicit_final_answer(self) -> None:
+        self.assertTrue(has_explicit_final_answer("Work.\nFinal answer: 42"))
+        self.assertTrue(has_explicit_final_answer(r"Work. \boxed{42}"))
+        self.assertFalse(has_explicit_final_answer("Work trails off without a final line"))
 
     def test_normalize_answer(self) -> None:
         self.assertEqual(normalize_answer(" The answer is 1,000. "), "1000")

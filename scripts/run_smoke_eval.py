@@ -30,11 +30,15 @@ def main() -> None:
             default_baselines(group_records, normalization=args.normalization),
             key=lambda item: item.method,
         )
+        method_width = max(24, *(len(result.method) for result in results))
         print(f"\n[{group_name}]")
-        print(f"{'method':<24} {'correct':>8} {'total':>8} {'accuracy':>10}")
-        print("-" * 54)
+        print(f"{'method':<{method_width}} {'correct':>8} {'total':>8} {'accuracy':>10}")
+        print("-" * (method_width + 30))
         for result in results:
-            print(f"{result.method:<24} {result.correct:>8} {result.total:>8} {result.accuracy:>10.3f}")
+            print(
+                f"{result.method:<{method_width}} "
+                f"{result.correct:>8} {result.total:>8} {result.accuracy:>10.3f}"
+            )
 
 
 if __name__ == "__main__":

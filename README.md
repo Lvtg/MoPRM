@@ -52,6 +52,32 @@ python scripts/score_debug_experts.py --input data/cache/debug_math_logic_labele
 python scripts/run_smoke_eval.py --input data/scored/debug_math_logic_scored.jsonl
 ```
 
+Generate real candidates with the OpenAI Responses API. The default command is a tiny
+smoke run: two problems, two candidates per problem.
+
+```bash
+python scripts/generate_openai_candidates.py --input data/splits/dev_40.jsonl --output data/candidates/openai_dev_smoke.jsonl --limit 2 --num-candidates 2
+python scripts/label_candidate_correctness.py --input data/candidates/openai_dev_smoke.jsonl --output data/cache/openai_dev_smoke_labeled.jsonl --overwrite
+```
+
+The script reads `OPENAI_API_KEY` from the process environment first, then from a
+local `.env` file. Do not commit `.env` or generated candidate files.
+
+Score generated candidates with lightweight OpenAI PRM-style experts. The scorer
+does not receive gold answers; it only sees the problem and candidate solution.
+
+```bash
+python scripts/score_openai_experts.py --input data/cache/openai_dev_smoke_labeled.jsonl --output data/scored/openai_dev_smoke_scored.jsonl --overwrite
+python scripts/run_smoke_eval.py --input data/scored/openai_dev_smoke_scored.jsonl --by-domain
+```
+
+Attach an LLM-based question-level gate and evaluate it alongside baselines:
+
+```bash
+python scripts/route_openai_gate.py --input data/scored/openai_dev_smoke_scored.jsonl --output data/scored/openai_dev_smoke_routed.jsonl --overwrite
+python scripts/run_smoke_eval.py --input data/scored/openai_dev_smoke_routed.jsonl --by-domain
+```
+
 ## Relation to Earlier Work
 
 Earlier notes in this repo focus on **Beyond the First Error: Process Reward Models for Reflective Mathematical Reasoning**. That paper remains useful as motivation: it shows that different reasoning styles need different process supervision signals. In MoPRM, reflective PRM scoring can be treated as one expert among several, instead of the whole project scope.

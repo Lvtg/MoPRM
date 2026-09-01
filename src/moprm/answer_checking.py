@@ -10,6 +10,10 @@ _CHOICE_RE = re.compile(
     flags=re.IGNORECASE,
 )
 _ANY_CHOICE_RE = re.compile(r"(?<![A-Z])([A-E])(?![A-Z])", flags=re.IGNORECASE)
+_ANSWER_LINE_RE = re.compile(
+    r"(?:final\s+answer|answer)\s*(?:is|:)?\s*(.+)$",
+    flags=re.IGNORECASE,
+)
 _LATEX_TEXT_RE = re.compile(r"\\text\{([^{}]*)\}")
 _LATEX_FRAC_RE = re.compile(r"\\(?:d?frac)\{([^{}]+)\}\{([^{}]+)\}")
 _LATEX_SQRT_RE = re.compile(r"\\sqrt\{([^{}]+)\}")
@@ -53,16 +57,28 @@ def extract_final_answer(text: str) -> str:
     if boxed != text:
         return boxed
 
-    patterns = [
-        r"(?:final\s+answer|answer)\s*(?:is|:)?\s*(.+)$",
-        r"\\boxed\{(.+?)\}",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, text, flags=re.IGNORECASE | re.DOTALL)
+    for line in reversed(text.splitlines()):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        match = _ANSWER_LINE_RE.search(stripped)
         if match:
             return match.group(1).strip()
 
+    boxed_match = re.search(r"\\boxed\{(.+?)\}", text, flags=re.IGNORECASE)
+    if boxed_match:
+        return boxed_match.group(1).strip()
+
     return text.strip()
+
+
+def has_explicit_final_answer(text: str) -> bool:
+    boxed = strip_boxed(text)
+    if boxed != text:
+        return True
+    if re.search(r"\\boxed\{(.+?)\}", text, flags=re.IGNORECASE):
+        return True
+    return any(_ANSWER_LINE_RE.search(line.strip()) for line in text.splitlines())
 
 
 def normalize_latex(answer: str) -> str:

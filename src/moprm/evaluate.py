@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from moprm.gates import domain_rule_gate, oracle_gate, uniform_gate
+from moprm.gates import domain_rule_gate, metadata_gate, oracle_gate, uniform_gate
 from moprm.normalization import normalize_expert_scores
 from moprm.schema import Candidate, ProblemRecord
 
@@ -110,11 +110,31 @@ def evaluate_records(
 
 def default_baselines(records: list[ProblemRecord], normalization: str = "rank") -> list[EvaluationResult]:
     expert_names = sorted({expert for record in records for expert in record.expert_names()})
+    metadata_gate_names = sorted(
+        {
+            gate_name
+            for record in records
+            for gate_name in (
+                record.metadata.get("gate_weights", {}).keys()
+                if isinstance(record.metadata.get("gate_weights"), dict)
+                else []
+            )
+        }
+    )
     results = [
         evaluate_records(records, "uniform_ensemble", lambda _r, names: uniform_gate(names), normalization),
         evaluate_records(records, "domain_rule_gate", domain_rule_gate, normalization),
         evaluate_records(records, "oracle_gate", oracle_gate, normalization),
     ]
+    for gate_name in metadata_gate_names:
+        results.append(
+            evaluate_records(
+                records,
+                f"metadata_gate:{gate_name}",
+                metadata_gate(gate_name),
+                normalization,
+            )
+        )
     for expert in expert_names:
         results.append(evaluate_records(records, f"single:{expert}", single_expert_gate(expert), normalization))
     return results

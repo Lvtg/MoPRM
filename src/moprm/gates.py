@@ -16,7 +16,7 @@ def domain_rule_gate(record: ProblemRecord, expert_names: list[str]) -> dict[str
 
     preferred_by_domain = {
         "math": ["math_prm", "reflective_judge", "general_judge"],
-        "logic": ["general_judge", "logic_judge", "reflective_judge"],
+        "logic": ["logic_judge", "general_judge", "reflective_judge"],
         "code": ["code_verifier", "general_judge"],
     }
     preferred = preferred_by_domain.get(record.domain, [])
@@ -44,3 +44,24 @@ def oracle_gate(record: ProblemRecord, expert_names: list[str]) -> dict[str, flo
         return uniform_gate(expert_names)
     weight = 1.0 / len(successful)
     return {expert: weight if expert in successful else 0.0 for expert in expert_names}
+
+
+def metadata_gate(gate_name: str):
+    def gate(record: ProblemRecord, expert_names: list[str]) -> dict[str, float]:
+        gate_weights = record.metadata.get("gate_weights", {})
+        if not isinstance(gate_weights, dict):
+            return uniform_gate(expert_names)
+        weights = gate_weights.get(gate_name, {})
+        if not isinstance(weights, dict):
+            return uniform_gate(expert_names)
+
+        cleaned = {
+            expert: max(0.0, float(weights.get(expert, 0.0)))
+            for expert in expert_names
+        }
+        total = sum(cleaned.values())
+        if total <= 0:
+            return uniform_gate(expert_names)
+        return {expert: weight / total for expert, weight in cleaned.items()}
+
+    return gate
