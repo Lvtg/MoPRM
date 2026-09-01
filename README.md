@@ -1,20 +1,43 @@
 # MoPRM
 
-MoPRM is a course-project experiment on **router-guided mixtures of process reward models** for reasoning tasks.
+MoPRM is a course-project experiment on **router-guided mixtures of heterogeneous process reward models** for reasoning tasks.
 
-The project studies whether a lightweight gate can choose or weight multiple PRM/verifier experts for different problems and candidate solutions, improving Best-of-N selection compared with any single expert or a naive ensemble.
+The project studies whether a lightweight gate can choose or weight multiple independently sourced PRM/verifier experts for different problems and candidate solutions, improving Best-of-N selection compared with any single expert, a naive ensemble, or an OpenAI-only multi-rubric judge baseline.
+
+## Project Goal
+
+The revised goal is to build a **heterogeneous MoPRM** system:
+
+- at least **two non-OpenAI PRM/reward experts** in the main expert pool;
+- one math-specialized open-source PRM;
+- one logic/reasoning-specialized open-source PRM or reward model;
+- two OpenAI-based judges kept as general and reflective baselines/supporting experts;
+- a question-level gate first, followed by a trained gate once heterogeneous scores exist.
+
+The current OpenAI scorer is intentionally treated as an **OpenAI multi-rubric judge baseline**, not as the final MoPRM expert pool.
 
 ## Current Scope
 
 Recommended 15-day scope:
 
 - domains: math reasoning and logic reasoning, with code reasoning as an optional extension;
-- experts: math PRM, reflective/general judge, rule-based verifier, and optionally an MC-style recoverability expert;
+- experts: at least two non-OpenAI PRM/reward experts plus two OpenAI-based judge experts;
 - gate: question-level trained router first, candidate-aware router only if time allows;
 - main metric: `PRM@8`, with `PRM@16` as an extension;
-- baselines: best single expert, uniform ensemble, domain-rule gate, LLM gate, trained gate, oracle gate.
+- baselines: OpenAI multi-rubric judge, best single expert, uniform ensemble, domain-rule gate, LLM gate, trained gate, oracle gate.
+
+Target expert pool:
+
+| Expert name | Source type | Intended role |
+|---|---|---|
+| `open_math_prm` | non-OpenAI open-source PRM | math process correctness |
+| `open_logic_prm` | non-OpenAI open-source logic/reasoning RM or PRM | logical consistency and reasoning validity |
+| `openai_general_judge` | OpenAI judge | broad candidate reliability |
+| `openai_reflective_judge` | OpenAI judge | self-checking and error-recovery quality |
 
 ## Main Plan
+
+The current project goal is in [notes/project_goal.md](notes/project_goal.md).
 
 The current experiment plan is in [notes/moprm_15_day_experiment_plan.md](notes/moprm_15_day_experiment_plan.md).
 

@@ -159,3 +159,35 @@ This run validates the real OpenAI generation -> evaluation labeling -> expert
 scoring -> LLM gate -> BoN evaluation pipeline. It is not yet evidence that
 MoPRM improves over baselines, because this pilot is too small and the scorer is
 strong enough that all methods select correct candidates.
+
+## 2026-09-01: Goal Revision Toward Heterogeneous Experts
+
+Decision after project discussion:
+
+```text
+The OpenAI multi-rubric scorer remains a baseline.
+The final MoPRM expert pool should include at least two non-OpenAI PRM/reward experts.
+```
+
+Target expert pool:
+
+```text
+open_math_prm           non-OpenAI open-source math PRM
+open_logic_prm          non-OpenAI open-source logic/reasoning RM or PRM
+openai_general_judge    OpenAI general reliability judge
+openai_reflective_judge OpenAI reflective/error-recovery judge
+```
+
+Rationale:
+
+Using four rubric dimensions from the same OpenAI model is too homogeneous for
+the main MoPRM claim. It is useful as a baseline and scaffolding, but the final
+experiment should test routing over independently sourced experts.
+
+Plan impact:
+
+```text
+Next immediate stage: integrate one open-source math PRM.
+Second stage: integrate one non-OpenAI logic/reasoning reward model or PRM.
+Only then train/evaluate the main gate against heterogeneous expert scores.
+```

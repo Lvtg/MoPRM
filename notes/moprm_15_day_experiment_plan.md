@@ -8,9 +8,16 @@ Working title:
 
 Core question:
 
-Can a lightweight gate dynamically route different reasoning problems or candidate solutions to suitable process reward model experts, improving Best-of-N selection over any single PRM or naive ensemble?
+Can a lightweight gate dynamically route different reasoning problems or candidate solutions to suitable **heterogeneous** process reward model experts, improving Best-of-N selection over any single PRM, a naive ensemble, or an OpenAI-only multi-rubric judge baseline?
 
 The project shifts from improving one PRM to coordinating multiple PRMs. This is a good course-project scope because we do not need to train large PRMs from scratch. The main trainable component is a small gate/router, while the expert pool can reuse existing PRMs, reward models, rule-based verifiers, or LLM judges.
+
+Updated goal after the September 1 discussion:
+
+- The current OpenAI scorer is an **OpenAI multi-rubric judge baseline**, not the final expert pool.
+- The main MoPRM system should include at least **two non-OpenAI PRM/reward experts**.
+- The target expert pool is: one open-source math PRM, one open-source logic/reasoning PRM or RM, one OpenAI general judge, and one OpenAI reflective judge.
+- The main claim should depend on heterogeneity: routing is useful because different independently sourced experts specialize in different reasoning patterns.
 
 Relation to our earlier discussions:
 
@@ -45,19 +52,31 @@ Recommended first version:
 
 ## 2. Expert Pool
 
-The expert pool should be heterogeneous but manageable. The first 15-day version should target 3-4 experts.
+The expert pool should be heterogeneous but manageable. The first main version should target 4 experts, with at least 2 non-OpenAI experts.
 
 Recommended experts:
 
-| Expert | Role | Priority | Notes |
-|---|---|---:|---|
-| Math PRM | Strong on mathematical step correctness | High | Example: Qwen2.5-Math-PRM, Math-Shepherd-style PRM, Skywork PRM if runnable |
-| Reflective PRM or BFE-style judge | Strong on self-correction / reflective traces | High | Can be an LLM judge using Error Propagation / Error Cessation rules if the original model is unavailable |
-| General LLM judge | Broad but slower baseline expert | Medium | Useful for logic and mixed-domain reasoning |
-| Non-leaking verifier | High precision checks that do not use hidden gold answers | Medium | Format, consistency, symbolic constraints, public code tests, or other checks available at selection time |
+| Expert | Source | Role | Priority | Notes |
+|---|---|---|---:|---|
+| `open_math_prm` | non-OpenAI open-source PRM | mathematical step/process correctness | High | Candidate options: Qwen2.5-Math-PRM, Skywork PRM, RLHFlow/OpenR-style math PRM |
+| `open_logic_prm` | non-OpenAI open-source logic/reasoning RM or PRM | logical consistency, ordering, deduction, reasoning validity | High | Candidate options: LogicReward-style model, open reasoning RM, or another runnable non-OpenAI verifier specialized toward logic/reasoning |
+| `openai_general_judge` | OpenAI judge | broad candidate reliability across domains | Medium | Baseline/supporting expert, not the whole contribution |
+| `openai_reflective_judge` | OpenAI judge | self-checking, error recovery, reflective reasoning quality | Medium | Inspired by Beyond the First Error style signals |
+| Non-leaking verifier | local script or open tool | format/constraint checks available at selection time | Optional | May become a fifth expert or an auxiliary feature |
+| MC-style/recoverability expert | existing PRM/RM or rollout signal | future solvability/recoverability signal | Optional | Use only if cheap and non-leaking |
+
+Current baseline:
+
+```text
+openai_math_rubric
+openai_logic_rubric
+openai_general_judge
+openai_reflective_judge
+```
+
+This OpenAI-only setup is useful for validating the pipeline and producing a baseline table. It should not be described as the final MoPRM expert pool because the four scores come from one model family and one scoring interface.
 
 Gold-answer exact matching is for **evaluation and oracle-label construction only**. It should not be used as a normal scoring expert for math or logic, otherwise the experiment leaks the benchmark answer into the selector. Execution-based code verification is only a normal expert when the tests are genuinely available at selection time.
-| MC-style/recoverability expert | Future solvability signal | Optional | Can use an existing MC-style PRM if runnable; avoid expensive rollouts in the first version |
 
 Important calibration issue:
 
@@ -115,10 +134,10 @@ LLM gate prompt idea:
 ```text
 Given the problem and a list of reward model experts, assign weights to experts.
 Experts:
-1. Math PRM
-2. Reflective reasoning PRM
-3. General LLM judge
-4. Non-leaking verifier
+1. Open-source math PRM
+2. Open-source logic/reasoning PRM
+3. OpenAI general judge
+4. OpenAI reflective judge
 
 Return JSON weights that sum to 1.
 ```
@@ -145,10 +164,10 @@ For each problem `q`:
 Target example:
 
 ```text
-Math PRM selected correct answer: yes
-Reflective PRM selected correct answer: no
-General judge selected correct answer: yes
-Non-leaking verifier selected correct answer: no
+Open-source math PRM selected correct answer: yes
+Open-source logic/reasoning PRM selected correct answer: no
+OpenAI general judge selected correct answer: yes
+OpenAI reflective judge selected correct answer: no
 
 target gate distribution = [0.5, 0.0, 0.5, 0.0]
 ```
@@ -225,8 +244,9 @@ src/
   generation/
     generate_candidates.py
   scoring/
-    score_math_prm.py
-    score_general_judge.py
+    score_open_math_prm.py
+    score_open_logic_prm.py
+    score_openai_judges.py
     score_nonleaking_verifier.py
     normalize_scores.py
   routing/
@@ -261,16 +281,16 @@ Data record schema:
       "final_answer": "...",
       "is_correct": true,
       "expert_scores": {
-        "math_prm": 0.82,
-        "reflective_prm": 0.76,
-        "general_judge": 0.69,
-        "nonleaking_verifier": 0.74
+        "open_math_prm": 0.82,
+        "open_logic_prm": 0.41,
+        "openai_general_judge": 0.69,
+        "openai_reflective_judge": 0.76
       },
       "normalized_scores": {
-        "math_prm": 0.91,
-        "reflective_prm": 0.83,
-        "general_judge": 0.75,
-        "nonleaking_verifier": 0.74
+        "open_math_prm": 0.91,
+        "open_logic_prm": 0.25,
+        "openai_general_judge": 0.75,
+        "openai_reflective_judge": 0.83
       }
     }
   ]
@@ -278,6 +298,25 @@ Data record schema:
 ```
 
 ## 7. 15-Day Schedule
+
+Current status after the September 1 revision:
+
+```text
+Completed:
+- public math/logic data preparation
+- answer checking
+- OpenAI candidate generation
+- OpenAI multi-rubric scoring baseline
+- question-level OpenAI LLM gate baseline
+- pilot-scale BoN evaluation
+
+Current stage:
+- revised Day 5 is complete
+- next work starts at revised Day 6: open-source math PRM integration
+
+Blocked from main MoPRM claim until:
+- at least two non-OpenAI PRM/reward experts are integrated
+```
 
 ### Day 1: Scope Lock and Repro Setup
 
@@ -334,46 +373,66 @@ Deliverables:
 - first candidate solution set;
 - basic statistics: average length, correct rate, domain distribution.
 
-### Day 5: Expert 1-2 Integration
+### Day 5: OpenAI Multi-Rubric Baseline
 
 Goals:
 
-- integrate the easiest two experts first;
-- likely choices: math PRM + general judge;
-- run scoring on a 30-problem smoke test.
+- establish an OpenAI-only multi-rubric judge baseline;
+- produce math, logic, general, and reflective rubric scores from the same OpenAI model;
+- run scoring on a small pilot set and verify the end-to-end pipeline.
 
 Deliverables:
 
-- scored smoke-test dataset;
-- first PRM@8 numbers for individual experts.
-
-### Day 6: Expert 3-4 Integration
-
-Goals:
-
-- add reflective/BFE-style judge and optional MC-style expert;
-- define step splitting if needed;
-- run all experts on the small subset.
-
-Deliverables:
-
-- full expert score schema;
-- expert runtime and cost estimate.
-
-### Day 7: Score Normalization and Single-Expert Baselines
-
-Goals:
-
-- implement rank normalization and z-score normalization;
-- compute single-expert PRM@8;
-- compute uniform ensemble baseline.
-
-Deliverables:
-
+- scored pilot dataset;
 - first baseline table;
-- calibration sanity plots or tables.
+- clear caveat that this is not yet a heterogeneous MoPRM result.
 
-### Day 8: Oracle Gate and Routing Labels
+### Day 6: Open-Source Math PRM Integration
+
+Goals:
+
+- choose and install one runnable non-OpenAI math PRM;
+- implement `score_open_math_prm.py` adapter;
+- define step splitting/aggregation for math solutions;
+- run it on the math portion of the pilot/dev split.
+
+Deliverables:
+
+- math PRM adapter;
+- scored math subset;
+- runtime/memory estimate and failure notes.
+
+### Day 7: Open-Source Logic/Reasoning PRM Integration
+
+Goals:
+
+- choose one runnable non-OpenAI logic/reasoning reward model or PRM;
+- implement `score_open_logic_prm.py` adapter;
+- run it on the logic portion of the pilot/dev split;
+- if no logic-specific PRM is runnable, use an open-source reasoning reward model and document the limitation.
+
+Deliverables:
+
+- second non-OpenAI expert integrated;
+- scored logic/reasoning subset;
+- expert compatibility notes.
+
+### Day 8: Score Normalization and Heterogeneous Single-Expert Baselines
+
+Goals:
+
+- implement or verify rank normalization and z-score normalization;
+- compute single-expert PRM@N for every heterogeneous expert;
+- compute uniform ensemble and domain-rule gate baselines;
+- inspect whether open-source PRMs create meaningful expert disagreement.
+
+Deliverables:
+
+- first heterogeneous baseline table;
+- calibration sanity tables;
+- disagreement examples.
+
+### Day 9: Oracle Gate and Routing Labels
 
 Goals:
 
@@ -387,7 +446,7 @@ Deliverables:
 - oracle gate result;
 - 10 qualitative disagreement examples.
 
-### Day 9: LLM Gate Baseline
+### Day 10: LLM Gate Baseline on Heterogeneous Experts
 
 Goals:
 
@@ -401,7 +460,7 @@ Deliverables:
 - prompt and parsing script;
 - failure examples.
 
-### Day 10: Trained Gate
+### Day 11: Trained Gate
 
 Goals:
 
@@ -414,7 +473,7 @@ Deliverables:
 - trained gate checkpoint;
 - main result table v1.
 
-### Day 11: Main Experiment Run
+### Day 12: Main Experiment Run
 
 Goals:
 
@@ -428,7 +487,7 @@ Deliverables:
 - per-domain result table;
 - saved experiment logs.
 
-### Day 12: Ablations
+### Day 13: Ablations
 
 Goals:
 
@@ -441,23 +500,13 @@ Deliverables:
 - ablation table;
 - cost-performance table.
 
-### Day 13: Robustness and Generalization
+### Day 14: Robustness, Error Analysis, and Figure Preparation
 
 Goals:
 
 - test on harder subset or different generator if available;
 - check whether routing still helps when candidate quality distribution changes;
 - optional: include reflective math subset inspired by Beyond the First Error.
-
-Deliverables:
-
-- robustness table;
-- 5-10 representative success/failure cases.
-
-### Day 14: Error Analysis and Figure Preparation
-
-Goals:
-
 - analyze failure modes;
 - create routing confusion matrix;
 - create expert complementarity plot;
@@ -465,6 +514,8 @@ Goals:
 
 Deliverables:
 
+- robustness table;
+- 5-10 representative success/failure cases;
 - figures and tables;
 - error analysis notes;
 - final experiment summary.
@@ -490,7 +541,8 @@ Minimum version:
 
 - 200-300 problems total;
 - `N=8` candidates per problem;
-- 2-3 experts;
+- 4 experts total;
+- at least 2 non-OpenAI PRM/reward experts;
 - no PRM training, only gate training;
 - can run in several days with API scoring or one local GPU.
 
@@ -498,7 +550,8 @@ Recommended version:
 
 - 400-800 problems total;
 - `N=8` first, `N=16` for final run if feasible;
-- 3-4 experts;
+- 4 experts for the main heterogeneous pool;
+- at least one math-specialized open PRM and one logic/reasoning open RM/PRM;
 - one lightweight trained gate;
 - expected 1-2 days for data generation/scoring, depending on model/API speed.
 
@@ -530,7 +583,9 @@ Therefore:
 | Risk | Why it matters | Backup |
 |---|---|---|
 | PRM models are hard to run locally | 7B models can be slow and large | use fewer experts, quantization, or LLM-as-judge experts |
-| Experts are all math-heavy | cross-domain claim becomes weak | frame as reasoning-style routing first; add logic LLM judge |
+| Too many experts come from one OpenAI model | the method looks like multi-rubric prompting, not MoPRM | require at least two non-OpenAI experts before main claims |
+| Experts are all math-heavy | cross-domain claim becomes weak | add a logic/reasoning open RM, or explicitly frame it as reasoning-style routing |
+| Open-source logic PRM is not directly runnable | logic-specific PRM resources are less mature than math PRMs | use an open-source general reasoning reward model as the second non-OpenAI expert and document the limitation |
 | Gate only learns domain labels | contribution becomes shallow | add mixed/hard subsets and compare against domain-rule gate |
 | Scores are not calibrated | ensemble may underperform | use rank normalization and validation calibration |
 | Answer checking is noisy | PRM@N becomes unreliable | manually inspect sampled predictions; use multiple-choice or exact-answer tasks |
@@ -543,7 +598,11 @@ For a 15-day course project, the strongest manageable version is:
 ```text
 MoPRM with:
 - 2 domains: math + logic
-- 3 experts: math PRM, reflective/general judge, and a non-leaking verifier if available
+- 4 experts:
+  - open-source math PRM
+  - open-source logic/reasoning RM or PRM
+  - OpenAI general judge
+  - OpenAI reflective judge
 - question-level trained gate
 - LLM gate baseline
 - rank-normalized score fusion
@@ -582,6 +641,8 @@ Existing reward routing and MoE reward-modeling work means we should position th
 - ProcessBench: Identifying Process Errors in Mathematical Reasoning.
 - PRMBench: A Fine-Grained Process Reward Model Benchmark.
 - RewardBench / RewardBench-style RM evaluation, if using general reward models.
+- Qwen2.5-Math-PRM / Skywork PRM / RLHFlow or OpenR math PRMs as candidate open-source math experts.
+- LogicReward or another open-source reasoning reward model as candidate logic/reasoning expert.
 - RouteLLM: Learning to Route LLMs with Preference Data.
 - LASeR: reward model selection/routing with multi-armed bandits.
 - DMoERM: Mixture-of-Experts Reward Modeling.
