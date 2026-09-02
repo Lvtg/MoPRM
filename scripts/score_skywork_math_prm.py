@@ -31,6 +31,15 @@ def main() -> None:
     parser.add_argument("--expert-name", default=OPEN_MATH_PRM_EXPERT)
     parser.add_argument("--cache-dir", default="models/hf_cache")
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
+    parser.add_argument(
+        "--dtype",
+        default="auto",
+        choices=["auto", "float32", "float16", "bfloat16"],
+        help=(
+            "Torch dtype for model loading. Default auto currently resolves to "
+            "float32 for stable Skywork PRM scoring."
+        ),
+    )
     parser.add_argument("--aggregation", default="mean", choices=["mean", "min", "last", "geomean"])
     parser.add_argument("--max-length", type=int, default=4096)
     parser.add_argument("--max-steps", type=int, default=32)
@@ -66,7 +75,8 @@ def main() -> None:
     print(
         "Skywork math PRM scoring plan: "
         f"records={len(score_records)}/{len(records)}, candidates={total_candidates}, "
-        f"model={args.model}, expert={args.expert_name}, device={args.device}"
+        f"model={args.model}, expert={args.expert_name}, device={args.device}, "
+        f"dtype={args.dtype}"
     )
 
     if args.dry_run:
@@ -84,6 +94,7 @@ def main() -> None:
         expert_name=args.expert_name,
         cache_dir=args.cache_dir,
         device=args.device,
+        dtype=args.dtype,
         max_length=args.max_length,
         max_steps=args.max_steps,
         aggregation=args.aggregation,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from statistics import geometric_mean
 from typing import Any
 
@@ -34,6 +35,12 @@ def split_solution_steps(solution: str, max_steps: int | None = None) -> list[st
 def aggregate_step_rewards(step_rewards: list[float], method: str = "mean") -> float:
     if not step_rewards:
         return 0.0
+    nonfinite = [reward for reward in step_rewards if not math.isfinite(reward)]
+    if nonfinite:
+        raise ValueError(
+            "Skywork PRM produced non-finite step rewards. "
+            "Try --dtype float32 or --device cpu for a numerically stable run."
+        )
     if method == "mean":
         return sum(step_rewards) / len(step_rewards)
     if method == "min":
@@ -81,6 +88,7 @@ class SkyworkMathPRMConfig:
     expert_name: str = OPEN_MATH_PRM_EXPERT
     cache_dir: str = "models/hf_cache"
     device: str = "auto"
+    dtype: str = "auto"
     max_length: int = 4096
     max_steps: int | None = 32
     step_token: str = "\n"
@@ -117,7 +125,20 @@ class SkyworkMathPRMScorer:
         if device == "cuda" and not cuda_available:
             raise RuntimeError("CUDA was requested, but torch.cuda.is_available() is False.")
 
-        torch_dtype = torch.bfloat16 if device == "cuda" else torch.float32
+        if self.config.dtype == "auto":
+            # The Skywork 1.5B PRM produced NaN step rewards on this RTX 5070
+            # laptop when loaded in bf16. Float32 is slower but stable for the
+            # first local integration run.
+            torch_dtype = torch.float32
+        elif self.config.dtype == "float32":
+            torch_dtype = torch.float32
+        elif self.config.dtype == "float16":
+            torch_dtype = torch.float16
+        elif self.config.dtype == "bfloat16":
+            torch_dtype = torch.bfloat16
+        else:
+            raise ValueError(f"Unsupported dtype: {self.config.dtype}")
+
         self._tokenizer = AutoTokenizer.from_pretrained(
             self.config.model_name,
             trust_remote_code=True,
@@ -127,7 +148,7 @@ class SkyworkMathPRMScorer:
             self.config.model_name,
             trust_remote_code=True,
             cache_dir=self.config.cache_dir,
-            torch_dtype=torch_dtype,
+            dtype=torch_dtype,
             low_cpu_mem_usage=True,
         ).eval()
         self._model.to(device)
@@ -166,6 +187,7 @@ class SkyworkMathPRMScorer:
             base_outputs = self._model.model(
                 input_ids=input_tensor,
                 attention_mask=attention_mask,
+                use_cache=False,
                 return_dict=True,
             )
             hidden_states = base_outputs.last_hidden_state
@@ -181,6 +203,7 @@ class SkyworkMathPRMScorer:
             "provider": "skywork_hf",
             "model": self.config.model_name,
             "device": self._device,
+            "dtype": self.config.dtype,
             "aggregation": self.config.aggregation,
             "num_steps": len(prepared_steps),
             "num_reward_points": len(step_rewards),

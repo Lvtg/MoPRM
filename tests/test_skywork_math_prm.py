@@ -43,6 +43,10 @@ class SkyworkMathPRMTest(unittest.TestCase):
         self.assertAlmostEqual(aggregate_step_rewards([0.2, 0.8], "min"), 0.2)
         self.assertAlmostEqual(aggregate_step_rewards([0.2, 0.8], "last"), 0.8)
 
+    def test_aggregate_step_rewards_rejects_nan(self) -> None:
+        with self.assertRaises(ValueError):
+            aggregate_step_rewards([0.2, float("nan")], "mean")
+
     def test_prepare_skywork_input_marks_step_tokens(self) -> None:
         input_ids, steps, reward_flags = prepare_skywork_input(
             "Problem",

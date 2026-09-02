@@ -92,8 +92,8 @@ Local setup status:
 
 ```text
 .venv has CPU torch + transformers + accelerate installed.
-CUDA torch is preferred for real runs on the RTX 5070 Laptop GPU, but the CUDA
-wheel download is large and should be retried when network conditions are better.
+.venv_cuda has CUDA torch 2.7.1+cu128 and can see the RTX 5070 Laptop GPU.
+Skywork 1.5B weights are cached locally under models/hf_cache.
 ```
 
 Day 7-9:

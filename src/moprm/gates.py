@@ -15,8 +15,24 @@ def domain_rule_gate(record: ProblemRecord, expert_names: list[str]) -> dict[str
         return {}
 
     preferred_by_domain = {
-        "math": ["open_math_prm", "math_prm", "openai_reflective_judge", "reflective_judge", "openai_general_judge", "general_judge"],
-        "logic": ["open_logic_prm", "logic_judge", "openai_general_judge", "general_judge", "openai_reflective_judge", "reflective_judge"],
+        "math": [
+            "open_math_prm",
+            "openai_math_rubric",
+            "math_prm",
+            "openai_reflective_judge",
+            "reflective_judge",
+            "openai_general_judge",
+            "general_judge",
+        ],
+        "logic": [
+            "open_logic_prm",
+            "openai_logic_rubric",
+            "logic_judge",
+            "openai_general_judge",
+            "general_judge",
+            "openai_reflective_judge",
+            "reflective_judge",
+        ],
         "code": ["code_verifier", "general_judge"],
     }
     preferred = preferred_by_domain.get(record.domain, [])

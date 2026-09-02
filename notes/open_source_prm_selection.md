@@ -12,10 +12,20 @@ CPU threads: 24
 Python: 3.10.10
 ```
 
-The local `.venv` currently has CPU PyTorch installed. CUDA PyTorch 12.8 was
-available from the PyTorch wheel index, but the 2.75 GB download was too slow and
-interrupted repeatedly during setup. We should retry CUDA installation only when
-network conditions are better.
+The original local `.venv` had CPU PyTorch. A CUDA environment was later prepared
+at:
+
+```text
+.venv_cuda
+```
+
+Current CUDA environment:
+
+```text
+torch: 2.7.1+cu128
+CUDA available: yes
+GPU: NVIDIA GeForce RTX 5070 Laptop GPU
+```
 
 ## First Math PRM Choice
 
@@ -50,6 +60,7 @@ Adapter added:
 ```text
 src/moprm/scoring/skywork_math_prm.py
 scripts/score_skywork_math_prm.py
+scripts/download_skywork_weight.py
 ```
 
 The adapter writes scores as:
@@ -75,5 +86,6 @@ python scripts/score_skywork_math_prm.py \
   --overwrite
 ```
 
-If CPU inference is too slow, pause after a one-record smoke test and retry after
-CUDA PyTorch is installed.
+Use `--dtype float32` for the first CUDA runs. On this laptop, bf16 CUDA scoring
+produced NaN step rewards for some candidates, while CPU float32 and CUDA
+float32 were stable.

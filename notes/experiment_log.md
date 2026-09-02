@@ -251,3 +251,128 @@ result: small config/tokenizer/custom-code files downloaded successfully
 issue: 3.09GB model weight download did not progress beyond small cache files
 action: interrupted the run and kept the adapter ready for the next download attempt
 ```
+
+## 2026-09-02: Skywork Math PRM CUDA Pilot
+
+Environment update:
+
+```text
+.venv_cuda
+torch: 2.7.1+cu128
+CUDA available: yes
+GPU: NVIDIA GeForce RTX 5070 Laptop GPU
+```
+
+Weight cache:
+
+```text
+model: Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B
+weight: pytorch_model.bin
+size: 3,087,498,236 bytes
+cache: models/hf_cache/.../snapshots/.../pytorch_model.bin
+SHA256/etag: verified externally before this run
+```
+
+CPU smoke output:
+
+```text
+data/scored/skywork_math_prm_pilot1.jsonl
+record: gsm8k_0076
+candidates: 4
+open_math_prm scores: 0.555142, 0.577435, 0.493211, 0.446626
+```
+
+CUDA dtype finding:
+
+```text
+CUDA bf16 produced NaN step rewards for two candidates on gsm8k_0076.
+CPU float32 and CUDA float32 were stable.
+Adapter updated to support --dtype and to reject non-finite step rewards.
+Default auto dtype is conservative float32 for this Skywork PRM integration.
+```
+
+Full pilot scoring:
+
+```text
+input: data/scored/openai_pilot10_n4_scored.jsonl
+output: data/scored/openai_pilot10_n4_with_skywork_math.jsonl
+device: cuda
+dtype: float32
+records: 10
+candidates: 40
+open_math_prm coverage: 40 / 40
+non-finite scores: 0
+```
+
+Open math PRM score distribution:
+
+```text
+math candidates: 20, min=0.218508, max=0.746356, mean=0.552536
+logic candidates: 20, min=0.486544, max=0.729964, mean=0.580342
+```
+
+Transitional heterogeneous pool:
+
+```text
+output: data/scored/openai_pilot10_n4_hetero_math_pool.jsonl
+experts:
+- open_math_prm
+- openai_logic_rubric
+- openai_general_judge
+- openai_reflective_judge
+rewrite:
+- dropped OpenAI math_prm rubric
+- renamed OpenAI logic/general/reflective rubrics for clarity
+```
+
+Evaluation on transitional heterogeneous pool:
+
+```text
+domain_rule_gate:               8 / 10 overall, 3 / 5 math
+metadata_gate:openai_llm_gate:  8 / 10 overall, 3 / 5 math
+uniform_ensemble:               8 / 10 overall, 3 / 5 math
+single:open_math_prm:           8 / 10 overall, 3 / 5 math
+oracle_gate:                   10 / 10 overall, 5 / 5 math
+```
+
+Interpretation:
+
+The first non-OpenAI math PRM is integrated and runnable, but it is not
+automatically better on the current generated candidate pool. The LLM/domain
+gates over-trust the specialized math expert on math problems, so this pilot
+motivates calibration and trained routing rather than naive domain routing.
+
+## 2026-09-02: Skywork Weight Download Completed
+
+Download status:
+
+```text
+model: Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B
+revision: 98d69606595eedbdbbbf0a7d28efdcd462ba6a67
+weight: pytorch_model.bin
+size: 3,087,498,236 bytes
+cache: models/hf_cache
+```
+
+The earlier Hugging Face CLI attempts created process-unique `.incomplete`
+files, so interrupted partial downloads were not reused automatically. Added a
+small resume helper that keeps a stable `.part` file, uses HTTP Range requests,
+verifies the final SHA256 against the Hugging Face etag, and then links the
+weight into the local snapshot cache.
+
+Implementation update:
+
+```text
+scripts/download_skywork_weight.py
+src/moprm/scoring/skywork_math_prm.py now passes use_cache=False for PRM scoring
+```
+
+Offline one-record smoke:
+
+```text
+command: HF_HUB_OFFLINE=1 python scripts/score_skywork_math_prm.py --input data/cache/openai_pilot10_n4_labeled.jsonl --output data/scored/skywork_math_prm_pilot1.jsonl --domains math --limit 1 --device cpu --overwrite
+result: succeeded
+record: gsm8k_0076
+candidates scored: 4
+open_math_prm scores: 0.555142, 0.577435, 0.493211, 0.446626
+```

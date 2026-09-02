@@ -109,6 +109,12 @@ python scripts/score_skywork_math_prm.py --input data/cache/openai_pilot10_n4_la
 
 The first selected math PRM is `Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B`; selection notes are in [notes/open_source_prm_selection.md](notes/open_source_prm_selection.md).
 
+Build a transitional heterogeneous expert pool after adding `open_math_prm`:
+
+```bash
+python scripts/rewrite_expert_pool.py --input data/scored/openai_pilot10_n4_with_skywork_math.jsonl --output data/scored/openai_pilot10_n4_hetero_math_pool.jsonl --drop math_prm --rename logic_judge=openai_logic_rubric --rename general_judge=openai_general_judge --rename reflective_judge=openai_reflective_judge --overwrite
+```
+
 For local PRM inference, install optional dependencies into the ignored `.venv`:
 
 ```bash
@@ -120,6 +126,12 @@ Dry-run the adapter before downloading model weights:
 
 ```bash
 python scripts/score_skywork_math_prm.py --input data/cache/openai_pilot10_n4_labeled.jsonl --domains math --limit 3 --dry-run
+```
+
+If Hugging Face downloads are unstable, use the resumable helper:
+
+```bash
+.\.venv_cuda\Scripts\python.exe scripts/download_skywork_weight.py
 ```
 
 ## Relation to Earlier Work
