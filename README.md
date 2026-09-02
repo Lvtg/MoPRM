@@ -101,6 +101,13 @@ python scripts/route_openai_gate.py --input data/scored/openai_dev_smoke_scored.
 python scripts/run_smoke_eval.py --input data/scored/openai_dev_smoke_routed.jsonl --by-domain
 ```
 
+Inspect expert complementarity, LLM-gate weights, raw-score separation, and
+oracle gaps:
+
+```bash
+python scripts/analyze_expert_pool.py --input data/scored/openai_dev40_n4_hetero_math_pool_routed.jsonl
+```
+
 Score math candidates with the first non-OpenAI open-source PRM adapter:
 
 ```bash

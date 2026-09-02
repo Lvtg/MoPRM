@@ -376,3 +376,152 @@ record: gsm8k_0076
 candidates scored: 4
 open_math_prm scores: 0.555142, 0.577435, 0.493211, 0.446626
 ```
+
+## 2026-09-02: dev_40 Heterogeneous Math-PRM Pilot
+
+Candidate generation:
+
+```text
+input: data/splits/dev_40.jsonl
+output: data/candidates/openai_dev40_n4.jsonl
+model: gpt-4.1-mini
+temperature: 1.0
+num_candidates: 4
+problems: 40
+candidates: 160
+```
+
+Evaluation-only correctness labels:
+
+```text
+correct candidates: 129 / 160
+avg correct candidates per problem: 3.225 / 4
+all-candidate-wrong problems: 6 / 40, all in math
+all-candidate-correct problems: 30 / 40
+logic: avg 3.900 correct candidates/problem, 0 all-wrong
+math: avg 2.550 correct candidates/problem, 6 all-wrong
+```
+
+OpenAI baseline expert scoring:
+
+```text
+input: data/cache/openai_dev40_n4_labeled.jsonl
+output: data/scored/openai_dev40_n4_scored.jsonl
+records: 40
+candidates: 160
+reported scoring tokens: 98,058
+```
+
+Skywork math PRM scoring:
+
+```text
+input: data/scored/openai_dev40_n4_scored.jsonl
+output: data/scored/openai_dev40_n4_with_skywork_math.jsonl
+device: cuda
+dtype: float32
+records: 40
+candidates: 160
+open_math_prm coverage: 160 / 160
+```
+
+Clean transitional expert pool:
+
+```text
+output: data/scored/openai_dev40_n4_hetero_math_pool.jsonl
+experts:
+- open_math_prm
+- openai_logic_rubric
+- openai_general_judge
+- openai_reflective_judge
+rewrite:
+- dropped OpenAI math_prm rubric
+- renamed OpenAI logic/general/reflective rubrics for clarity
+```
+
+LLM gate routing:
+
+```text
+output: data/scored/openai_dev40_n4_hetero_math_pool_routed.jsonl
+records: 40
+reported gate tokens: 15,242
+```
+
+Evaluation on routed clean pool:
+
+```text
+overall:
+domain_rule_gate:               33 / 40 = 0.825
+metadata_gate:openai_llm_gate:  33 / 40 = 0.825
+uniform_ensemble:               33 / 40 = 0.825
+single:open_math_prm:           33 / 40 = 0.825
+single:openai_general_judge:    32 / 40 = 0.800
+single:openai_logic_rubric:     32 / 40 = 0.800
+single:openai_reflective_judge: 33 / 40 = 0.825
+oracle_gate:                    34 / 40 = 0.850
+
+logic:
+all methods:                    20 / 20 = 1.000
+
+math:
+domain_rule_gate:               13 / 20 = 0.650
+metadata_gate:openai_llm_gate:  13 / 20 = 0.650
+uniform_ensemble:               13 / 20 = 0.650
+single:open_math_prm:           13 / 20 = 0.650
+single:openai_general_judge:    12 / 20 = 0.600
+single:openai_logic_rubric:     12 / 20 = 0.600
+single:openai_reflective_judge: 13 / 20 = 0.650
+oracle_gate:                    14 / 20 = 0.700
+```
+
+Gate-weight diagnostics:
+
+```text
+average openai_llm_gate weights:
+logic:
+  open_math_prm            0.000
+  openai_general_judge     0.185
+  openai_logic_rubric      0.570
+  openai_reflective_judge  0.245
+math:
+  open_math_prm            0.570
+  openai_general_judge     0.005
+  openai_logic_rubric      0.110
+  openai_reflective_judge  0.315
+```
+
+Raw score separation:
+
+```text
+overall delta(correct - wrong):
+open_math_prm:            +0.007
+openai_general_judge:     +0.055
+openai_logic_rubric:      +0.030
+openai_reflective_judge:  +0.034
+
+math delta(correct - wrong):
+open_math_prm:            +0.020
+openai_general_judge:     +0.057
+openai_logic_rubric:      +0.031
+openai_reflective_judge:  +0.039
+```
+
+Interpretation:
+
+The dev_40 run confirms that the first non-OpenAI PRM is integrated in the real
+pipeline, but the current benchmark slice is near its candidate-generation
+ceiling. Six math problems have no correct candidate at all, so the maximum
+selectable accuracy is 34/40. Current routing reaches 33/40 and the oracle only
+recovers one additional problem. This means the next useful experiment should
+increase the available complementarity rather than only tweak the gate:
+
+```text
+1. add a second non-OpenAI expert, preferably a logic/reasoning RM or PRM;
+2. create a harder or larger split with more mixed correct/wrong candidates;
+3. then train/calibrate a lightweight gate on held-out problems.
+```
+
+Implementation utility added:
+
+```text
+scripts/analyze_expert_pool.py
+```
