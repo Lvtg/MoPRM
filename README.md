@@ -124,9 +124,9 @@ python scripts/sample_dataset.py \
 Then run the candidate/scoring pipeline:
 
 ```bash
-python scripts/generate_openai_candidates.py --input data/splits/hard_dev_100.jsonl --output data/candidates/openai_hard_dev100_n8.jsonl --num-candidates 8 --max-output-tokens 512 --temperature 1.0 --overwrite
+python scripts/generate_openai_candidates.py --input data/splits/hard_dev_100.jsonl --output data/candidates/openai_hard_dev100_n8.jsonl --limit 100 --num-candidates 8 --max-output-tokens 512 --temperature 1.0 --concurrency 4 --overwrite
 python scripts/label_candidate_correctness.py --input data/candidates/openai_hard_dev100_n8.jsonl --output data/cache/openai_hard_dev100_n8_labeled.jsonl --overwrite
-python scripts/score_openai_experts.py --input data/cache/openai_hard_dev100_n8_labeled.jsonl --output data/scored/openai_hard_dev100_n8_scored.jsonl --overwrite
+python scripts/score_openai_experts.py --input data/cache/openai_hard_dev100_n8_labeled.jsonl --output data/scored/openai_hard_dev100_n8_scored.jsonl --concurrency 4 --overwrite
 ```
 
 Local open-source expert scoring:

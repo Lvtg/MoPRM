@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import sys
 
@@ -47,6 +48,12 @@ def main() -> None:
     parser.add_argument("--timeout", type=float, default=120.0)
     parser.add_argument("--max-retries", type=int, default=2)
     parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=1,
+        help="Number of problem records to process concurrently. Default: 1.",
+    )
+    parser.add_argument(
         "--overwrite",
         action="store_true",
         help="Allow replacing an existing output file.",
@@ -88,13 +95,39 @@ def main() -> None:
         temperature=args.temperature,
     )
 
-    generated: list[dict] = []
-    for index, record in enumerate(records, start=1):
-        print(f"[{index}/{len(records)}] {record.problem_id} ({record.domain})")
-        generated_record = generate_openai_candidates(record, client, config)
-        generated.append(generated_record.to_dict())
-        write_jsonl(output, generated)
+    if args.concurrency < 1:
+        raise ValueError("--concurrency must be >= 1")
 
+    generated_by_index: dict[int, dict] = {}
+    if args.concurrency == 1:
+        for index, record in enumerate(records, start=1):
+            print(f"[{index}/{len(records)}] {record.problem_id} ({record.domain})")
+            generated_record = generate_openai_candidates(record, client, config)
+            generated_by_index[index] = generated_record.to_dict()
+            write_jsonl(output, [generated_by_index[i] for i in sorted(generated_by_index)])
+    else:
+        print(f"Using concurrency={args.concurrency}")
+
+        def worker(index_and_record):
+            index, record = index_and_record
+            generated_record = generate_openai_candidates(record, client, config)
+            return index, record.problem_id, record.domain, generated_record.to_dict()
+
+        with ThreadPoolExecutor(max_workers=args.concurrency) as executor:
+            futures = [
+                executor.submit(worker, item)
+                for item in enumerate(records, start=1)
+            ]
+            for future in as_completed(futures):
+                index, problem_id, domain, generated_record = future.result()
+                generated_by_index[index] = generated_record
+                print(
+                    f"[done {len(generated_by_index)}/{len(records)}] "
+                    f"{problem_id} ({domain})"
+                )
+                write_jsonl(output, [generated_by_index[i] for i in sorted(generated_by_index)])
+
+    generated = [generated_by_index[i] for i in sorted(generated_by_index)]
     usage = _usage_from_records(generated)
     print(f"Wrote {output}")
     if usage["total_tokens"]:
