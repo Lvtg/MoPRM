@@ -31,7 +31,7 @@ Target expert pool:
 | Expert name | Source type | Intended role |
 |---|---|---|
 | `open_math_prm` | non-OpenAI open-source PRM | math process correctness |
-| `open_logic_prm` | non-OpenAI open-source logic/reasoning RM or PRM | logical consistency and reasoning validity |
+| `open_reasoning_rm` | non-OpenAI open-source RM | response-level logic and general reasoning quality |
 | `openai_general_judge` | OpenAI judge | broad candidate reliability |
 | `openai_reflective_judge` | OpenAI judge | self-checking and error-recovery quality |
 
@@ -116,10 +116,28 @@ python scripts/score_skywork_math_prm.py --input data/cache/openai_pilot10_n4_la
 
 The first selected math PRM is `Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B`; selection notes are in [notes/open_source_prm_selection.md](notes/open_source_prm_selection.md).
 
+Score candidates with the second non-OpenAI expert, a response-level reasoning
+reward model:
+
+```powershell
+$env:HF_HUB_OFFLINE='1'
+.\.venv_cuda\Scripts\python.exe scripts/score_skywork_reward_v2.py --input data/scored/openai_dev40_n4_with_skywork_math.jsonl --output data/scored/openai_dev40_n4_with_open_experts.jsonl --domains all --device cuda --dtype auto --overwrite
+```
+
+The selected reasoning RM is `Skywork/Skywork-Reward-V2-Qwen3-1.7B`. It writes
+scores as `expert_scores.open_reasoning_rm`.
+
 Build a transitional heterogeneous expert pool after adding `open_math_prm`:
 
 ```bash
 python scripts/rewrite_expert_pool.py --input data/scored/openai_pilot10_n4_with_skywork_math.jsonl --output data/scored/openai_pilot10_n4_hetero_math_pool.jsonl --drop math_prm --rename logic_judge=openai_logic_rubric --rename general_judge=openai_general_judge --rename reflective_judge=openai_reflective_judge --overwrite
+```
+
+Build the current main heterogeneous expert pool after both open-source experts
+are scored:
+
+```bash
+python scripts/rewrite_expert_pool.py --input data/scored/openai_dev40_n4_with_open_experts.jsonl --output data/scored/openai_dev40_n4_two_open_expert_pool.jsonl --drop math_prm --drop logic_judge --rename general_judge=openai_general_judge --rename reflective_judge=openai_reflective_judge --overwrite
 ```
 
 For local PRM inference, install optional dependencies into the ignored `.venv`:

@@ -525,3 +525,155 @@ Implementation utility added:
 ```text
 scripts/analyze_expert_pool.py
 ```
+
+## 2026-09-03: Second Non-OpenAI Expert Integrated
+
+Selected second open-source expert:
+
+```text
+model: Skywork/Skywork-Reward-V2-Qwen3-1.7B
+revision: e51ea3e08fb81326c3b812a7ff0cb9cee83e59cc
+weight: model.safetensors
+size: 3,441,189,792 bytes
+cache: models/hf_cache
+expert name: open_reasoning_rm
+score type: response-level sequence reward logit
+```
+
+Implementation added:
+
+```text
+src/moprm/scoring/skywork_reward_v2.py
+scripts/score_skywork_reward_v2.py
+tests/test_skywork_reward_v2.py
+```
+
+Smoke result:
+
+```text
+input: data/scored/openai_dev40_n4_with_skywork_math.jsonl
+output: data/scored/skywork_reward_v2_smoke1.jsonl
+device: cuda
+dtype: auto, resolved to CUDA bfloat16
+records: 1
+candidates: 4
+open_reasoning_rm scores: 6.21875, 7.34375, 7.5, 5.5
+```
+
+Full dev_40 scoring:
+
+```text
+input: data/scored/openai_dev40_n4_with_skywork_math.jsonl
+output: data/scored/openai_dev40_n4_with_open_experts.jsonl
+device: cuda
+dtype: auto
+records: 40
+candidates: 160
+open_reasoning_rm coverage: 160 / 160
+```
+
+Open reasoning RM score distribution:
+
+```text
+logic candidates: 80, min=-0.781250, max=11.750000, mean=7.087109
+math candidates: 80, min=2.156250, max=12.500000, mean=9.074805
+```
+
+Current main heterogeneous pool:
+
+```text
+output: data/scored/openai_dev40_n4_two_open_expert_pool.jsonl
+experts:
+- open_math_prm
+- open_reasoning_rm
+- openai_general_judge
+- openai_reflective_judge
+rewrite:
+- dropped OpenAI math_prm rubric
+- dropped OpenAI logic_judge rubric
+- renamed OpenAI general/reflective rubrics for clarity
+```
+
+LLM gate routing:
+
+```text
+output: data/scored/openai_dev40_n4_two_open_expert_pool_routed.jsonl
+records: 40
+reported gate tokens: 15,232
+```
+
+Evaluation on current main heterogeneous pool:
+
+```text
+overall:
+domain_rule_gate:               33 / 40 = 0.825
+metadata_gate:openai_llm_gate:  33 / 40 = 0.825
+uniform_ensemble:               32 / 40 = 0.800
+single:open_math_prm:           33 / 40 = 0.825
+single:open_reasoning_rm:       32 / 40 = 0.800
+single:openai_general_judge:    32 / 40 = 0.800
+single:openai_reflective_judge: 33 / 40 = 0.825
+oracle_gate:                    34 / 40 = 0.850
+
+logic:
+all methods:                    20 / 20 = 1.000
+
+math:
+domain_rule_gate:               13 / 20 = 0.650
+metadata_gate:openai_llm_gate:  13 / 20 = 0.650
+uniform_ensemble:               12 / 20 = 0.600
+single:open_math_prm:           13 / 20 = 0.650
+single:open_reasoning_rm:       12 / 20 = 0.600
+single:openai_general_judge:    12 / 20 = 0.600
+single:openai_reflective_judge: 13 / 20 = 0.650
+oracle_gate:                    14 / 20 = 0.700
+```
+
+Gate-weight diagnostics:
+
+```text
+average openai_llm_gate weights:
+logic:
+  open_math_prm            0.000
+  open_reasoning_rm        0.505
+  openai_general_judge     0.300
+  openai_reflective_judge  0.195
+math:
+  open_math_prm            0.615
+  open_reasoning_rm        0.190
+  openai_general_judge     0.085
+  openai_reflective_judge  0.110
+```
+
+Raw score separation:
+
+```text
+overall delta(correct - wrong):
+open_math_prm:            +0.007
+open_reasoning_rm:        -0.233
+openai_general_judge:     +0.055
+openai_reflective_judge:  +0.034
+
+logic delta(correct - wrong):
+open_math_prm:            -0.092
+open_reasoning_rm:        +7.165
+openai_general_judge:     +0.450
+openai_reflective_judge:  +0.383
+
+math delta(correct - wrong):
+open_math_prm:            +0.020
+open_reasoning_rm:        +0.381
+openai_general_judge:     +0.057
+openai_reflective_judge:  +0.039
+```
+
+Interpretation:
+
+The main MoPRM pool now satisfies the heterogeneity requirement: two non-OpenAI
+experts plus two OpenAI supporting judges. On dev_40, the LLM gate routes in the
+expected direction, assigning most logic weight to `open_reasoning_rm` and most
+math weight to `open_math_prm`. The accuracy does not improve beyond 33/40
+because this split still has a very small true oracle gap: six math problems have
+no correct candidate, and only one additional problem can be rescued by expert
+selection. The next experiment should therefore create a harder/larger candidate
+set, such as N=8, before investing in a trained gate.

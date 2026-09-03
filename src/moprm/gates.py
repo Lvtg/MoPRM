@@ -25,6 +25,7 @@ def domain_rule_gate(record: ProblemRecord, expert_names: list[str]) -> dict[str
             "general_judge",
         ],
         "logic": [
+            "open_reasoning_rm",
             "open_logic_prm",
             "openai_logic_rubric",
             "logic_judge",

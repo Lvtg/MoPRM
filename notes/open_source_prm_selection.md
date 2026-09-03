@@ -89,3 +89,52 @@ python scripts/score_skywork_math_prm.py \
 Use `--dtype float32` for the first CUDA runs. On this laptop, bf16 CUDA scoring
 produced NaN step rewards for some candidates, while CPU float32 and CUDA
 float32 were stable.
+
+## Second Reasoning RM Choice
+
+Selected second target:
+
+```text
+Skywork/Skywork-Reward-V2-Qwen3-1.7B
+```
+
+Local cache status:
+
+```text
+revision: e51ea3e08fb81326c3b812a7ff0cb9cee83e59cc
+weight: model.safetensors
+size: 3,441,189,792 bytes
+cache: models/hf_cache
+SHA256: verified before integration
+```
+
+Reasons:
+
+- It is a real non-OpenAI reward model, independent from the OpenAI rubric
+  baseline.
+- The 1.7B Qwen3 variant is practical on the RTX 5070 Laptop GPU, while 8B-class
+  reward models are riskier for the local 8GB VRAM setup.
+- The official interface is simple: `AutoModelForSequenceClassification` returns
+  one scalar reward logit for a problem-response conversation.
+- It is better described as a response-level reasoning RM than a step-level PRM,
+  so the project uses the honest expert name `open_reasoning_rm`.
+- In the MoPRM pool, it is the practical current proxy for the originally planned
+  `open_logic_prm`.
+
+Integration:
+
+```text
+src/moprm/scoring/skywork_reward_v2.py
+scripts/score_skywork_reward_v2.py
+tests/test_skywork_reward_v2.py
+```
+
+The adapter writes scores as:
+
+```text
+expert_scores.open_reasoning_rm
+```
+
+The score is the raw sequence reward logit. The evaluator handles cross-expert
+scale differences with per-problem rank normalization, so the raw logit is kept
+instead of being squashed to `[0, 1]`.

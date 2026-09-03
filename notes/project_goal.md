@@ -17,7 +17,7 @@ The OpenAI-based scorer that produces math, logic, general, and reflective rubri
 | Expert | Source type | Role |
 |---|---|---|
 | `open_math_prm` | non-OpenAI open-source PRM | math process correctness |
-| `open_logic_prm` | non-OpenAI open-source logic/reasoning RM or PRM | logic and reasoning consistency |
+| `open_reasoning_rm` | non-OpenAI open-source RM | response-level logic and general reasoning quality |
 | `openai_general_judge` | OpenAI judge | broad candidate reliability |
 | `openai_reflective_judge` | OpenAI judge | self-checking and error-recovery quality |
 
@@ -33,12 +33,19 @@ question-level LLM gate
 BoN / PRM@N evaluation
 ```
 
+Current stage:
+
+```text
+two real non-OpenAI experts are integrated:
+1. open_math_prm via Skywork-o1-Open-PRM-Qwen-2.5-1.5B
+2. open_reasoning_rm via Skywork-Reward-V2-Qwen3-1.7B
+```
+
 Next stage:
 
 ```text
-replace at least two OpenAI rubric dimensions with real non-OpenAI experts:
-1. open-source math PRM
-2. open-source logic/reasoning RM or PRM
+create a harder or larger candidate set, then train/calibrate the gate
+over heterogeneous expert scores.
 ```
 
 ## Main Claim Boundary
@@ -54,4 +61,3 @@ Final claim, only after heterogeneous experts are integrated:
 Claim to avoid:
 
 > Four OpenAI rubric scores alone constitute a full MoPRM expert pool.
-

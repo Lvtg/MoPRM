@@ -34,6 +34,7 @@ class OpenAIGateConfig:
 
 EXPERT_DESCRIPTIONS = {
     "open_math_prm": "Non-OpenAI open-source math PRM for mathematical process correctness.",
+    "open_reasoning_rm": "Non-OpenAI open-source response-level reward model for broad reasoning and logic quality.",
     "open_logic_prm": "Non-OpenAI open-source logic/reasoning PRM or reward model.",
     "openai_math_rubric": "OpenAI-based math rubric score from the multi-rubric baseline.",
     "openai_logic_rubric": "OpenAI-based logic rubric score from the multi-rubric baseline.",

@@ -37,7 +37,7 @@ Recommended final expert pool:
 | Expert | Source type | First target | Notes |
 |---|---|---|---|
 | `open_math_prm` | non-OpenAI open-source PRM | Qwen2.5-Math-PRM, Skywork PRM, or RLHFlow/OpenR-style math PRM | Prioritize a smaller/runnable checkpoint first; step aggregation is required. |
-| `open_logic_prm` | non-OpenAI open-source logic/reasoning RM or PRM | LogicReward-style model or open-source reasoning reward model | Logic PRMs may be less plug-and-play than math PRMs; document limitations if using a general reasoning RM. |
+| `open_reasoning_rm` | non-OpenAI open-source RM | Skywork-Reward-V2-Qwen3-1.7B | Practical proxy for a logic/reasoning expert; response-level reward rather than step-level PRM. |
 | `openai_general_judge` | OpenAI judge | existing scorer split into a general-only expert | Baseline/supporting expert. |
 | `openai_reflective_judge` | OpenAI judge | existing scorer split into a reflective-only expert | Uses BFE-inspired self-checking/error-recovery rubric. |
 | Non-leaking verifier | local scripts | optional auxiliary expert | Use only checks available at selection time, such as format, consistency, public code tests, or symbolic constraints. |
@@ -94,13 +94,14 @@ Local setup status:
 .venv has CPU torch + transformers + accelerate installed.
 .venv_cuda has CUDA torch 2.7.1+cu128 and can see the RTX 5070 Laptop GPU.
 Skywork 1.5B weights are cached locally under models/hf_cache.
+Skywork Reward-V2 Qwen3-1.7B weights are cached locally under models/hf_cache.
 ```
 
 Day 7-9:
 
-- one runnable non-OpenAI logic/reasoning PRM or reward model;
-- adapter that writes scores into the same JSONL schema;
-- heterogeneous expert disagreement analysis.
+- one runnable non-OpenAI logic/reasoning PRM or reward model: done via Skywork Reward-V2 Qwen3-1.7B;
+- adapter that writes scores into the same JSONL schema: done as open_reasoning_rm;
+- heterogeneous expert disagreement analysis: in progress.
 
 After the first baseline table:
 

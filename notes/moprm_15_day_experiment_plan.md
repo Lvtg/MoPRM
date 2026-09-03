@@ -59,7 +59,7 @@ Recommended experts:
 | Expert | Source | Role | Priority | Notes |
 |---|---|---|---:|---|
 | `open_math_prm` | non-OpenAI open-source PRM | mathematical step/process correctness | High | Candidate options: Qwen2.5-Math-PRM, Skywork PRM, RLHFlow/OpenR-style math PRM |
-| `open_logic_prm` | non-OpenAI open-source logic/reasoning RM or PRM | logical consistency, ordering, deduction, reasoning validity | High | Candidate options: LogicReward-style model, open reasoning RM, or another runnable non-OpenAI verifier specialized toward logic/reasoning |
+| `open_reasoning_rm` | non-OpenAI open-source reasoning RM | response-level logical consistency and broad reasoning quality | High | Current implementation: Skywork-Reward-V2-Qwen3-1.7B; practical proxy for the originally planned logic PRM |
 | `openai_general_judge` | OpenAI judge | broad candidate reliability across domains | Medium | Baseline/supporting expert, not the whole contribution |
 | `openai_reflective_judge` | OpenAI judge | self-checking, error recovery, reflective reasoning quality | Medium | Inspired by Beyond the First Error style signals |
 | Non-leaking verifier | local script or open tool | format/constraint checks available at selection time | Optional | May become a fifth expert or an auxiliary feature |
@@ -245,7 +245,7 @@ src/
     generate_candidates.py
   scoring/
     score_open_math_prm.py
-    score_open_logic_prm.py
+    score_skywork_reward_v2.py
     score_openai_judges.py
     score_nonleaking_verifier.py
     normalize_scores.py
@@ -282,13 +282,13 @@ Data record schema:
       "is_correct": true,
       "expert_scores": {
         "open_math_prm": 0.82,
-        "open_logic_prm": 0.41,
+        "open_reasoning_rm": 0.41,
         "openai_general_judge": 0.69,
         "openai_reflective_judge": 0.76
       },
       "normalized_scores": {
         "open_math_prm": 0.91,
-        "open_logic_prm": 0.25,
+        "open_reasoning_rm": 0.25,
         "openai_general_judge": 0.75,
         "openai_reflective_judge": 0.83
       }
@@ -402,19 +402,19 @@ Deliverables:
 - scored math subset;
 - runtime/memory estimate and failure notes.
 
-### Day 7: Open-Source Logic/Reasoning PRM Integration
+### Day 7: Open-Source Logic/Reasoning RM Integration
 
 Goals:
 
-- choose one runnable non-OpenAI logic/reasoning reward model or PRM;
-- implement `score_open_logic_prm.py` adapter;
-- run it on the logic portion of the pilot/dev split;
-- if no logic-specific PRM is runnable, use an open-source reasoning reward model and document the limitation.
+- choose one runnable non-OpenAI logic/reasoning reward model or PRM: done with Skywork-Reward-V2-Qwen3-1.7B;
+- implement `score_skywork_reward_v2.py` adapter: done;
+- run it on the logic/pilot/dev split: done on dev_40 all domains;
+- document that it is a response-level reasoning RM, not a step-level logic PRM.
 
 Deliverables:
 
-- second non-OpenAI expert integrated;
-- scored logic/reasoning subset;
+- second non-OpenAI expert integrated as `open_reasoning_rm`;
+- scored logic/reasoning subset and full dev_40 pool;
 - expert compatibility notes.
 
 ### Day 8: Score Normalization and Heterogeneous Single-Expert Baselines
