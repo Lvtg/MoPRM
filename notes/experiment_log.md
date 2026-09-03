@@ -677,3 +677,73 @@ because this split still has a very small true oracle gap: six math problems hav
 no correct candidate, and only one additional problem can be rescued by expert
 selection. The next experiment should therefore create a harder/larger candidate
 set, such as N=8, before investing in a trained gate.
+
+## 2026-09-03: Next Harder Experiment Plan
+
+Decision:
+
+```text
+Next experiment: hard_dev_100_n8
+```
+
+Rationale:
+
+```text
+The previous dev_40, N=4 run had too little oracle headroom:
+- current routing: 33 / 40
+- oracle gate:     34 / 40
+
+Therefore the next step should increase candidate diversity and task difficulty
+before training the gate.
+```
+
+Chosen split:
+
+```text
+total: 100 problems
+math: 60
+logic: 40
+
+math sources:
+- HuggingFaceH4/MATH-500: 50
+- openai/gsm8k: 10
+
+logic sources:
+- BIG-Bench-Hard/logical_deduction_seven_objects: 20
+- BIG-Bench-Hard/logical_deduction_five_objects: 10
+- BIG-Bench-Hard/logical_deduction_three_objects: 10
+
+candidates per problem for next run: N=8
+```
+
+Implementation update:
+
+```text
+scripts/sample_dataset.py now supports repeated --source-quota arguments.
+```
+
+Verified split command:
+
+```bash
+python scripts/sample_dataset.py \
+  --input data/cache/public_subsets/math_logic_combined.jsonl \
+  --output data/splits/hard_dev_100.jsonl \
+  --source-quota "math|HuggingFaceH4/MATH-500=50" \
+  --source-quota "math|openai/gsm8k=10" \
+  --source-quota "logic|BIG-Bench-Hard/logical_deduction_seven_objects=20" \
+  --source-quota "logic|BIG-Bench-Hard/logical_deduction_five_objects=10" \
+  --source-quota "logic|BIG-Bench-Hard/logical_deduction_three_objects=10" \
+  --seed 23
+```
+
+Observed output:
+
+```text
+Domains: {'logic': 40, 'math': 60}
+Sources:
+- logic|BIG-Bench-Hard/logical_deduction_seven_objects: 20
+- logic|BIG-Bench-Hard/logical_deduction_five_objects: 10
+- logic|BIG-Bench-Hard/logical_deduction_three_objects: 10
+- math|HuggingFaceH4/MATH-500: 50
+- math|openai/gsm8k: 10
+```

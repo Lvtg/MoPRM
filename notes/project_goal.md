@@ -44,8 +44,14 @@ two real non-OpenAI experts are integrated:
 Next stage:
 
 ```text
-create a harder or larger candidate set, then train/calibrate the gate
-over heterogeneous expert scores.
+create hard_dev_100_n8:
+- 100 problems
+- 8 candidates per problem
+- 60 math / 40 logic
+- math dominated by MATH500 rather than GSM8K
+
+Then train/calibrate the gate only if this harder split creates enough oracle
+gap and expert complementarity.
 ```
 
 ## Main Claim Boundary
@@ -54,7 +60,7 @@ Safe current claim:
 
 > We have implemented a reproducible MoPRM pipeline and an OpenAI multi-rubric baseline.
 
-Final claim, only after heterogeneous experts are integrated:
+Final claim, only after the harder split supports it:
 
 > MoPRM can exploit specialization among heterogeneous PRM/reward experts through routing, improving or matching Best-of-N selection while exposing accuracy-cost tradeoffs.
 

@@ -16,6 +16,37 @@ The revised goal is to build a **heterogeneous MoPRM** system:
 
 The current OpenAI scorer is intentionally treated as an **OpenAI multi-rubric judge baseline**, not as the final MoPRM expert pool.
 
+## Current Status
+
+As of 2026-09-03, the main heterogeneous expert pool is implemented at
+`dev_40, N=4` scale:
+
+| Expert name | Source | Score type |
+|---|---|---|
+| `open_math_prm` | `Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B` | step-level math PRM, mean step reward |
+| `open_reasoning_rm` | `Skywork/Skywork-Reward-V2-Qwen3-1.7B` | response-level reward logit |
+| `openai_general_judge` | OpenAI Responses API | general reliability rubric |
+| `openai_reflective_judge` | OpenAI Responses API | self-checking / error-recovery rubric |
+
+Latest small-scale result:
+
+```text
+split: dev_40
+candidates per problem: N=4
+main pool: open_math_prm + open_reasoning_rm + openai_general_judge + openai_reflective_judge
+
+overall:
+domain_rule_gate              33 / 40 = 0.825
+openai_llm_gate               33 / 40 = 0.825
+uniform_ensemble              32 / 40 = 0.800
+oracle_gate                   34 / 40 = 0.850
+```
+
+Interpretation: the two non-OpenAI experts are now integrated, but `dev_40, N=4`
+is too close to its oracle ceiling. Six math problems have no correct candidate,
+and only one additional problem can be rescued by expert selection. The next
+experiment should therefore increase both difficulty and candidate count.
+
 ## Current Scope
 
 Recommended 15-day scope:
@@ -41,6 +72,80 @@ The current project goal is in [notes/project_goal.md](notes/project_goal.md).
 
 The current experiment plan is in [notes/moprm_15_day_experiment_plan.md](notes/moprm_15_day_experiment_plan.md).
 
+## Next Experiment: `hard_dev_100_n8`
+
+Recommended next run:
+
+```text
+split: hard_dev_100
+total problems: 100
+candidate count: N=8
+math/logic mix: 60 math + 40 logic
+math source mix: 50 MATH500 + 10 GSM8K
+logic source mix: 20 BBH seven-object + 10 five-object + 10 three-object
+```
+
+Why this instead of another balanced `dev_80`:
+
+- `dev_40, N=4` already has very little oracle gap, so simply doubling size is
+  less useful than making the split harder.
+- MATH500 should replace most GSM8K because GSM8K is too easy for the current
+  generator/judges.
+- `N=8` creates more candidate diversity and gives the gate more chances to
+  differ from uniform or single-expert selection.
+- `100 x 8 = 800` candidates is still manageable for the two local models and
+  the OpenAI scoring budget.
+
+Estimated OpenAI API scale, based on the observed `dev_40, N=4` run:
+
+```text
+candidate generation: about 800 API calls, roughly 340k tokens
+OpenAI expert scoring: about 800 API calls, roughly 490k tokens
+LLM gate routing: about 100 API calls, roughly 40k tokens
+```
+
+The two open-source experts run locally from `models/hf_cache` and should not
+consume API budget.
+
+Create the split:
+
+```bash
+python scripts/sample_dataset.py \
+  --input data/cache/public_subsets/math_logic_combined.jsonl \
+  --output data/splits/hard_dev_100.jsonl \
+  --source-quota "math|HuggingFaceH4/MATH-500=50" \
+  --source-quota "math|openai/gsm8k=10" \
+  --source-quota "logic|BIG-Bench-Hard/logical_deduction_seven_objects=20" \
+  --source-quota "logic|BIG-Bench-Hard/logical_deduction_five_objects=10" \
+  --source-quota "logic|BIG-Bench-Hard/logical_deduction_three_objects=10" \
+  --seed 23
+```
+
+Then run the candidate/scoring pipeline:
+
+```bash
+python scripts/generate_openai_candidates.py --input data/splits/hard_dev_100.jsonl --output data/candidates/openai_hard_dev100_n8.jsonl --num-candidates 8 --max-output-tokens 512 --temperature 1.0 --overwrite
+python scripts/label_candidate_correctness.py --input data/candidates/openai_hard_dev100_n8.jsonl --output data/cache/openai_hard_dev100_n8_labeled.jsonl --overwrite
+python scripts/score_openai_experts.py --input data/cache/openai_hard_dev100_n8_labeled.jsonl --output data/scored/openai_hard_dev100_n8_scored.jsonl --overwrite
+```
+
+Local open-source expert scoring:
+
+```powershell
+$env:HF_HUB_OFFLINE='1'
+.\.venv_cuda\Scripts\python.exe scripts\score_skywork_math_prm.py --input data\scored\openai_hard_dev100_n8_scored.jsonl --output data\scored\openai_hard_dev100_n8_with_skywork_math.jsonl --domains all --device cuda --dtype float32 --overwrite
+.\.venv_cuda\Scripts\python.exe scripts\score_skywork_reward_v2.py --input data\scored\openai_hard_dev100_n8_with_skywork_math.jsonl --output data\scored\openai_hard_dev100_n8_with_open_experts.jsonl --domains all --device cuda --dtype auto --overwrite
+```
+
+Build and evaluate the main heterogeneous pool:
+
+```bash
+python scripts/rewrite_expert_pool.py --input data/scored/openai_hard_dev100_n8_with_open_experts.jsonl --output data/scored/openai_hard_dev100_n8_two_open_expert_pool.jsonl --drop math_prm --drop logic_judge --rename general_judge=openai_general_judge --rename reflective_judge=openai_reflective_judge --overwrite
+python scripts/route_openai_gate.py --input data/scored/openai_hard_dev100_n8_two_open_expert_pool.jsonl --output data/scored/openai_hard_dev100_n8_two_open_expert_pool_routed.jsonl --overwrite
+python scripts/run_smoke_eval.py --input data/scored/openai_hard_dev100_n8_two_open_expert_pool_routed.jsonl --by-domain
+python scripts/analyze_expert_pool.py --input data/scored/openai_hard_dev100_n8_two_open_expert_pool_routed.jsonl
+```
+
 ## Local Smoke Test
 
 Run the toy evaluation without downloading models or datasets:
@@ -65,6 +170,9 @@ python scripts/sample_dataset.py --input data/cache/public_subsets/math_logic_co
 ```
 
 Prepared public data is written under `data/cache/` and is intentionally ignored by git.
+
+The sampler also supports exact source quotas, which is useful for creating
+harder splits with more MATH500 and fewer GSM8K examples.
 
 Generate gold-derived debug candidates for end-to-end pipeline testing only:
 

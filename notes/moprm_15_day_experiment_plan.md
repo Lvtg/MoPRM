@@ -19,6 +19,14 @@ Updated goal after the September 1 discussion:
 - The target expert pool is: one open-source math PRM, one open-source logic/reasoning PRM or RM, one OpenAI general judge, and one OpenAI reflective judge.
 - The main claim should depend on heterogeneity: routing is useful because different independently sourced experts specialize in different reasoning patterns.
 
+Current update after the September 3 integration:
+
+- Two non-OpenAI experts are now integrated: `open_math_prm` and
+  `open_reasoning_rm`.
+- The first main heterogeneous pool has been evaluated on `dev_40, N=4`.
+- The next priority is not gate training yet; first expand to a harder `N=8`
+  candidate set so that expert routing has enough oracle gap to matter.
+
 Relation to our earlier discussions:
 
 - **Beyond the First Error** remains useful as a motivation and expert source: it shows that different reasoning styles, especially reflective long-CoT, require different process supervision signals.
@@ -118,6 +126,54 @@ Experts: 3-4
 ```
 
 Use `N=8` first. If the pipeline works, add `N=16` for the final table.
+
+### Next Hard Split
+
+The immediate next experiment should be `hard_dev_100_n8`:
+
+```text
+total problems: 100
+math: 60 problems
+  - 50 from MATH500
+  - 10 from GSM8K
+logic: 40 problems
+  - 20 from BBH logical_deduction_seven_objects
+  - 10 from BBH logical_deduction_five_objects
+  - 10 from BBH logical_deduction_three_objects
+candidates per problem: N=8
+```
+
+Rationale:
+
+- `dev_40, N=4` is too close to its oracle ceiling: current routing reaches
+  33/40, while the oracle reaches only 34/40.
+- Increasing `N` from 4 to 8 should create more candidate diversity and a larger
+  measurable gap between single experts, uniform fusion, LLM routing, and oracle
+  routing.
+- Increasing the MATH500 proportion makes the math split harder and reduces the
+  dominance of easy GSM8K examples.
+- `100 x 8 = 800` candidates remains manageable for the current local GPU and
+  OpenAI budget.
+
+Estimated API scale from the observed `dev_40, N=4` run:
+
+```text
+candidate generation: about 800 API calls, roughly 340k tokens
+OpenAI expert scoring: about 800 API calls, roughly 490k tokens
+LLM gate routing: about 100 API calls, roughly 40k tokens
+```
+
+The local Skywork experts do not consume API budget after their weights are
+cached.
+
+If `hard_dev_100_n8` still has low oracle gap, the next escalation should be:
+
+```text
+hard_dev_120_n8 or hard_dev_100_n16
+```
+
+Do not train the main gate until the harder split shows enough disagreement and
+oracle headroom.
 
 ## 4. Gate Design
 
@@ -309,13 +365,19 @@ Completed:
 - OpenAI multi-rubric scoring baseline
 - question-level OpenAI LLM gate baseline
 - pilot-scale BoN evaluation
+- Skywork math PRM integrated as open_math_prm
+- Skywork Reward-V2 reasoning RM integrated as open_reasoning_rm
+- dev_40, N=4 heterogeneous pool evaluated
 
 Current stage:
-- revised Day 5 is complete
-- next work starts at revised Day 6: open-source math PRM integration
+- revised Days 5-8 are complete at small scale
+- next work starts at revised Day 9/12 boundary: create harder N=8 candidate set
+  before training/calibrating the gate
 
 Blocked from main MoPRM claim until:
-- at least two non-OpenAI PRM/reward experts are integrated
+- no longer blocked on expert heterogeneity;
+- still blocked from strong routing claims until a harder split produces enough
+  oracle gap and expert complementarity
 ```
 
 ### Day 1: Scope Lock and Repro Setup
@@ -432,6 +494,13 @@ Deliverables:
 - calibration sanity tables;
 - disagreement examples.
 
+Status:
+
+```text
+Complete at dev_40, N=4 scale.
+Need repeat on hard_dev_100, N=8 before reporting main results.
+```
+
 ### Day 9: Oracle Gate and Routing Labels
 
 Goals:
@@ -445,6 +514,16 @@ Deliverables:
 - gate training dataset;
 - oracle gate result;
 - 10 qualitative disagreement examples.
+
+Revision:
+
+```text
+Before building the trained-gate dataset, run hard_dev_100_n8 and verify:
+- enough problems have mixed correct/wrong candidates;
+- oracle_gate is meaningfully above best single expert/domain-rule gate;
+- experts disagree for accuracy-relevant reasons, not only tie-breaking among
+  all-correct candidates.
+```
 
 ### Day 10: LLM Gate Baseline on Heterogeneous Experts
 
@@ -486,6 +565,20 @@ Deliverables:
 - main result table;
 - per-domain result table;
 - saved experiment logs.
+
+Immediate command target:
+
+```text
+hard_dev_100_n8
+```
+
+If this run is affordable and produces useful oracle gap, freeze it as the main
+course-project scale. If not, expand only one axis at a time:
+
+```text
+Option A: hard_dev_120_n8
+Option B: hard_dev_100_n16
+```
 
 ### Day 13: Ablations
 
