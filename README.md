@@ -18,34 +18,54 @@ The current OpenAI scorer is intentionally treated as an **OpenAI multi-rubric j
 
 ## Current Status
 
-As of 2026-09-03, the main heterogeneous expert pool is implemented at
-`dev_40, N=4` scale:
+As of 2026-09-03, the main heterogeneous expert pool has been run at
+`hard_dev_100, N=8` scale:
 
 | Expert name | Source | Score type |
 |---|---|---|
-| `open_math_prm` | `Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B` | step-level math PRM, mean step reward |
+| `open_math_prm` | `Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B` | step-level math PRM; `min` step aggregation works best so far |
 | `open_reasoning_rm` | `Skywork/Skywork-Reward-V2-Qwen3-1.7B` | response-level reward logit |
 | `openai_general_judge` | OpenAI Responses API | general reliability rubric |
 | `openai_reflective_judge` | OpenAI Responses API | self-checking / error-recovery rubric |
 
-Latest small-scale result:
+Latest result with the default mean aggregation for `open_math_prm`:
 
 ```text
-split: dev_40
-candidates per problem: N=4
+split: hard_dev_100
+candidates per problem: N=8
 main pool: open_math_prm + open_reasoning_rm + openai_general_judge + openai_reflective_judge
 
 overall:
-domain_rule_gate              33 / 40 = 0.825
-openai_llm_gate               33 / 40 = 0.825
-uniform_ensemble              32 / 40 = 0.800
-oracle_gate                   34 / 40 = 0.850
+domain_rule_gate              67 / 100 = 0.670
+openai_llm_gate               69 / 100 = 0.690
+uniform_ensemble              70 / 100 = 0.700
+best single expert            71 / 100 = 0.710  # open_reasoning_rm
+oracle_gate                   71 / 100 = 0.710
 ```
 
-Interpretation: the two non-OpenAI experts are now integrated, but `dev_40, N=4`
-is too close to its oracle ceiling. Six math problems have no correct candidate,
-and only one additional problem can be rescued by expert selection. The next
-experiment should therefore increase both difficulty and candidate count.
+After reaggregating the cached Skywork math PRM step rewards with `min` instead
+of `mean`, the main table improves:
+
+```text
+min aggregation + rank normalization:
+domain_rule_gate              71 / 100 = 0.710
+openai_llm_gate               70 / 100 = 0.700
+uniform_ensemble              71 / 100 = 0.710
+best single expert            71 / 100 = 0.710  # open_reasoning_rm
+oracle_gate                   72 / 100 = 0.720
+
+min aggregation + minmax normalization:
+domain_rule_gate              71 / 100 = 0.710
+openai_llm_gate               71 / 100 = 0.710
+uniform_ensemble              70 / 100 = 0.700
+best single expert            71 / 100 = 0.710  # open_reasoning_rm
+oracle_gate                   72 / 100 = 0.720
+```
+
+Interpretation: the harder `N=8` run is much more useful than `dev_40`, but the
+current expert pool still has limited routing headroom. The strongest next step
+is aggregation/calibration and a mixed-candidate analysis split, not blind gate
+training.
 
 ## Current Scope
 
@@ -72,9 +92,9 @@ The current project goal is in [notes/project_goal.md](notes/project_goal.md).
 
 The current experiment plan is in [notes/moprm_15_day_experiment_plan.md](notes/moprm_15_day_experiment_plan.md).
 
-## Next Experiment: `hard_dev_100_n8`
+## Latest Experiment: `hard_dev_100_n8`
 
-Recommended next run:
+Completed run:
 
 ```text
 split: hard_dev_100
@@ -96,12 +116,12 @@ Why this instead of another balanced `dev_80`:
 - `100 x 8 = 800` candidates is still manageable for the two local models and
   the OpenAI scoring budget.
 
-Estimated OpenAI API scale, based on the observed `dev_40, N=4` run:
+Observed OpenAI API usage:
 
 ```text
-candidate generation: about 800 API calls, roughly 340k tokens
-OpenAI expert scoring: about 800 API calls, roughly 490k tokens
-LLM gate routing: about 100 API calls, roughly 40k tokens
+candidate generation: 800 API calls, 408,180 tokens
+OpenAI expert scoring: 800 API calls, 603,493 tokens
+LLM gate routing: 100 API calls, 38,368 tokens
 ```
 
 The two open-source experts run locally from `models/hf_cache` and should not
@@ -142,9 +162,35 @@ Build and evaluate the main heterogeneous pool:
 ```bash
 python scripts/rewrite_expert_pool.py --input data/scored/openai_hard_dev100_n8_with_open_experts.jsonl --output data/scored/openai_hard_dev100_n8_two_open_expert_pool.jsonl --drop math_prm --drop logic_judge --rename general_judge=openai_general_judge --rename reflective_judge=openai_reflective_judge --overwrite
 python scripts/route_openai_gate.py --input data/scored/openai_hard_dev100_n8_two_open_expert_pool.jsonl --output data/scored/openai_hard_dev100_n8_two_open_expert_pool_routed.jsonl --overwrite
-python scripts/run_smoke_eval.py --input data/scored/openai_hard_dev100_n8_two_open_expert_pool_routed.jsonl --by-domain
+python scripts/run_smoke_eval.py --input data/scored/openai_hard_dev100_n8_two_open_expert_pool_routed.jsonl --by-domain --by-source
 python scripts/analyze_expert_pool.py --input data/scored/openai_hard_dev100_n8_two_open_expert_pool_routed.jsonl
 ```
+
+Optional but currently recommended: reaggregate the cached `open_math_prm`
+step rewards with `min` aggregation and evaluate again:
+
+```bash
+python scripts/reaggregate_skywork_math_prm.py --input data/scored/openai_hard_dev100_n8_two_open_expert_pool_routed.jsonl --output data/scored/openai_hard_dev100_n8_two_open_expert_pool_routed_math_min.jsonl --aggregation min --overwrite
+python scripts/run_smoke_eval.py --input data/scored/openai_hard_dev100_n8_two_open_expert_pool_routed_math_min.jsonl --by-domain --by-source
+python scripts/run_smoke_eval.py --input data/scored/openai_hard_dev100_n8_two_open_expert_pool_routed_math_min.jsonl --by-domain --by-source --normalization minmax
+python scripts/analyze_expert_pool.py --input data/scored/openai_hard_dev100_n8_two_open_expert_pool_routed_math_min.jsonl
+```
+
+## Next Step
+
+Do not jump straight to trained gate as the main result. First build a small
+analysis split from problems with mixed candidate correctness, because many
+`hard_dev_100_n8` examples are either all-correct or all-wrong:
+
+```text
+overall avg correct candidates/problem: 5.34 / 8
+all-wrong problems: 23 / 100
+all-correct problems: 59 / 100
+mixed problems: 18 / 100
+```
+
+The next useful question is: when there is at least one correct and one wrong
+candidate, can MoPRM routing beat `open_reasoning_rm` and uniform fusion?
 
 ## Local Smoke Test
 

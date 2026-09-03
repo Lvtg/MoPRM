@@ -44,14 +44,14 @@ two real non-OpenAI experts are integrated:
 Next stage:
 
 ```text
-create hard_dev_100_n8:
-- 100 problems
-- 8 candidates per problem
-- 60 math / 40 logic
-- math dominated by MATH500 rather than GSM8K
+hard_dev_100_n8 is complete.
 
-Then train/calibrate the gate only if this harder split creates enough oracle
-gap and expert complementarity.
+Next:
+1. use min aggregation for the cached open_math_prm step rewards;
+2. build a mixed-candidate analysis split from problems with 1..N-1 correct
+   candidates;
+3. train/calibrate the gate only if those mixed examples show enough oracle gap
+   and expert complementarity.
 ```
 
 ## Main Claim Boundary

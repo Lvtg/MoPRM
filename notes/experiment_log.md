@@ -747,3 +747,296 @@ Sources:
 - math|HuggingFaceH4/MATH-500: 50
 - math|openai/gsm8k: 10
 ```
+
+## 2026-09-03: hard_dev_100_n8 Main Run
+
+Candidate generation:
+
+```text
+input: data/splits/hard_dev_100.jsonl
+output: data/candidates/openai_hard_dev100_n8.jsonl
+model: gpt-4.1-mini
+temperature: 1.0
+num_candidates: 8
+problems: 100
+candidates: 800
+concurrency: 4
+reported generation tokens: 408,180
+```
+
+Implementation note:
+
+```text
+scripts/generate_openai_candidates.py and scripts/score_openai_experts.py now
+support --concurrency. The default remains 1, but hard_dev_100_n8 used
+--concurrency 4 for API-bound stages.
+```
+
+Evaluation-only correctness labels:
+
+```text
+correct candidates: 534 / 800 = 0.667
+
+overall:
+avg correct candidates/problem: 5.34 / 8
+all-wrong problems: 23 / 100
+all-correct problems: 59 / 100
+mixed problems: 18 / 100
+
+logic:
+correct candidates: 280 / 320 = 0.875
+avg correct candidates/problem: 7.00 / 8
+all-wrong problems: 3 / 40
+all-correct problems: 31 / 40
+
+math:
+correct candidates: 254 / 480 = 0.529
+avg correct candidates/problem: 4.23 / 8
+all-wrong problems: 20 / 60
+all-correct problems: 28 / 60
+```
+
+Source-level candidate correctness:
+
+```text
+MATH500:
+problems: 50
+correct candidates: 204 / 400 = 0.510
+avg correct candidates/problem: 4.08 / 8
+all-wrong: 18
+all-correct: 22
+
+GSM8K:
+problems: 10
+correct candidates: 50 / 80 = 0.625
+avg correct candidates/problem: 5.00 / 8
+all-wrong: 2
+all-correct: 6
+
+BBH seven-object logical deduction:
+problems: 20
+correct candidates: 120 / 160 = 0.750
+avg correct candidates/problem: 6.00 / 8
+all-wrong: 3
+all-correct: 11
+
+BBH five-object and three-object subsets:
+all candidates correct in this run.
+```
+
+OpenAI baseline expert scoring:
+
+```text
+input: data/cache/openai_hard_dev100_n8_labeled.jsonl
+output: data/scored/openai_hard_dev100_n8_scored.jsonl
+records: 100
+candidates: 800
+concurrency: 4
+reported scoring tokens: 603,493
+```
+
+Open-source expert scoring:
+
+```text
+open_math_prm:
+input: data/scored/openai_hard_dev100_n8_scored.jsonl
+output: data/scored/openai_hard_dev100_n8_with_skywork_math.jsonl
+device: cuda
+dtype: float32
+aggregation: mean
+coverage: 800 / 800
+
+open_reasoning_rm:
+input: data/scored/openai_hard_dev100_n8_with_skywork_math.jsonl
+output: data/scored/openai_hard_dev100_n8_with_open_experts.jsonl
+device: cuda
+dtype: auto
+coverage: 800 / 800
+```
+
+Main heterogeneous pool:
+
+```text
+output: data/scored/openai_hard_dev100_n8_two_open_expert_pool.jsonl
+experts:
+- open_math_prm
+- open_reasoning_rm
+- openai_general_judge
+- openai_reflective_judge
+```
+
+LLM gate routing:
+
+```text
+output: data/scored/openai_hard_dev100_n8_two_open_expert_pool_routed.jsonl
+records: 100
+reported gate tokens: 38,368
+```
+
+Evaluation with mean step aggregation for `open_math_prm`:
+
+```text
+overall:
+domain_rule_gate:               67 / 100 = 0.670
+metadata_gate:openai_llm_gate:  69 / 100 = 0.690
+uniform_ensemble:               70 / 100 = 0.700
+single:open_math_prm:           63 / 100 = 0.630
+single:open_reasoning_rm:       71 / 100 = 0.710
+single:openai_general_judge:    68 / 100 = 0.680
+single:openai_reflective_judge: 69 / 100 = 0.690
+oracle_gate:                    71 / 100 = 0.710
+
+logic:
+domain_rule_gate:               37 / 40 = 0.925
+metadata_gate:openai_llm_gate:  36 / 40 = 0.900
+single:open_reasoning_rm:       37 / 40 = 0.925
+oracle_gate:                    37 / 40 = 0.925
+
+math:
+domain_rule_gate:               30 / 60 = 0.500
+metadata_gate:openai_llm_gate:  33 / 60 = 0.550
+uniform_ensemble:               34 / 60 = 0.567
+single:open_math_prm:           30 / 60 = 0.500
+single:open_reasoning_rm:       34 / 60 = 0.567
+oracle_gate:                    34 / 60 = 0.567
+```
+
+Aggregation calibration:
+
+```text
+mean aggregation:
+single:open_math_prm: 63 / 100 overall, 30 / 60 math
+
+min aggregation:
+single:open_math_prm: 68 / 100 overall, 34 / 60 math
+domain_rule_gate:     71 / 100 overall, 34 / 60 math
+uniform_ensemble:     71 / 100 overall, 35 / 60 math
+oracle_gate:          72 / 100 overall, 35 / 60 math
+
+last aggregation:
+single:open_math_prm: 66 / 100 overall, 31 / 60 math
+
+geomean aggregation:
+single:open_math_prm: 63 / 100 overall, 30 / 60 math
+```
+
+Evaluation after reaggregating routed pool with `open_math_prm` min aggregation:
+
+```text
+rank normalization:
+overall:
+domain_rule_gate:               71 / 100 = 0.710
+metadata_gate:openai_llm_gate:  70 / 100 = 0.700
+uniform_ensemble:               71 / 100 = 0.710
+single:open_math_prm:           68 / 100 = 0.680
+single:open_reasoning_rm:       71 / 100 = 0.710
+oracle_gate:                    72 / 100 = 0.720
+
+math:
+domain_rule_gate:               34 / 60 = 0.567
+metadata_gate:openai_llm_gate:  34 / 60 = 0.567
+uniform_ensemble:               35 / 60 = 0.583
+single:open_math_prm:           34 / 60 = 0.567
+single:open_reasoning_rm:       34 / 60 = 0.567
+oracle_gate:                    35 / 60 = 0.583
+```
+
+Normalization ablation after `open_math_prm` min aggregation:
+
+```text
+rank:
+metadata_gate:openai_llm_gate:  70 / 100 overall, 34 / 60 math
+uniform_ensemble:               71 / 100 overall, 35 / 60 math
+
+minmax:
+metadata_gate:openai_llm_gate:  71 / 100 overall, 35 / 60 math
+uniform_ensemble:               70 / 100 overall, 34 / 60 math
+
+zscore:
+metadata_gate:openai_llm_gate:  70 / 100 overall, 34 / 60 math
+uniform_ensemble:               70 / 100 overall, 34 / 60 math
+```
+
+Mixed-candidate analysis:
+
+```text
+definition: keep problems with 1..7 correct candidates
+selected: 18 / 100 problems
+sources:
+- BIG-Bench-Hard/logical_deduction_seven_objects: 6
+- HuggingFaceH4/MATH-500: 10
+- openai/gsm8k: 2
+correct-count histogram:
+- 1 correct candidate: 5 problems
+- 2 correct candidates: 2 problems
+- 4 correct candidates: 7 problems
+- 5 correct candidates: 1 problem
+- 6 correct candidates: 1 problem
+- 7 correct candidates: 2 problems
+```
+
+Mixed-candidate PRM@8 after `open_math_prm` min aggregation:
+
+```text
+overall:
+domain_rule_gate:               12 / 18 = 0.667
+metadata_gate:openai_llm_gate:  11 / 18 = 0.611
+uniform_ensemble:               12 / 18 = 0.667
+single:open_math_prm:            9 / 18 = 0.500
+single:open_reasoning_rm:       12 / 18 = 0.667
+oracle_gate:                    13 / 18 = 0.722
+
+math:
+domain_rule_gate:                6 / 12 = 0.500
+metadata_gate:openai_llm_gate:   6 / 12 = 0.500
+uniform_ensemble:                7 / 12 = 0.583
+single:open_math_prm:            6 / 12 = 0.500
+single:open_reasoning_rm:        6 / 12 = 0.500
+oracle_gate:                     7 / 12 = 0.583
+```
+
+Diagnostics after min aggregation:
+
+```text
+all_experts_same_top_choice: 1 / 100
+any_expert_disagreement: 99 / 100
+
+average openai_llm_gate weights:
+logic:
+  open_math_prm            0.000
+  open_reasoning_rm        0.500
+  openai_general_judge     0.300
+  openai_reflective_judge  0.200
+math:
+  open_math_prm            0.587
+  open_reasoning_rm        0.208
+  openai_general_judge     0.088
+  openai_reflective_judge  0.117
+
+accuracy gap versus oracle:
+domain_rule_gate:              1 problem
+metadata_gate:openai_llm_gate: 2 problems
+uniform_ensemble:              1 problem
+```
+
+Interpretation:
+
+`hard_dev_100_n8` is a better stress test than `dev_40_n4`, but it still has
+limited useful routing headroom. The current pool's best single expert
+(`open_reasoning_rm`) and uniform/domain-rule baselines are already close to the
+expert-oracle gate. The main failure is no longer expert heterogeneity; it is
+candidate-set composition and expert calibration. The Skywork math PRM should
+not be reported with mean aggregation as the only result; cached step rewards
+show that `min` aggregation is stronger on this run.
+
+Next recommended work:
+
+```text
+1. Treat min aggregation as the current preferred open_math_prm setting.
+2. Build a mixed-candidate analysis split from problems with 1..N-1 correct
+   candidates, because all-correct/all-wrong problems cannot show routing gains.
+3. Only train a gate after checking whether mixed problems have enough expert
+   complementarity beyond open_reasoning_rm and uniform fusion.
+4. Consider a more diverse/weaker candidate generator or generation prompt if
+   mixed examples remain too rare.
+```

@@ -16,6 +16,11 @@ def main() -> None:
     parser.add_argument("--input", default="examples/smoke_moprm.jsonl")
     parser.add_argument("--normalization", default="rank", choices=["rank", "minmax", "zscore"])
     parser.add_argument("--by-domain", action="store_true")
+    parser.add_argument(
+        "--by-source",
+        action="store_true",
+        help="Also report groups by domain plus metadata.source.",
+    )
     args = parser.parse_args()
 
     records = load_jsonl(Path(args.input))
@@ -23,6 +28,19 @@ def main() -> None:
     if args.by_domain:
         for domain in sorted({record.domain for record in records}):
             groups[domain] = [record for record in records if record.domain == domain]
+    if args.by_source:
+        for key in sorted(
+            {
+                f"{record.domain}|{record.metadata.get('source', '')}"
+                for record in records
+            }
+        ):
+            domain, source = key.split("|", 1)
+            groups[key] = [
+                record
+                for record in records
+                if record.domain == domain and str(record.metadata.get("source", "")) == source
+            ]
 
     print(f"Loaded {len(records)} problems from {args.input}")
     for group_name, group_records in groups.items():

@@ -24,8 +24,9 @@ Current update after the September 3 integration:
 - Two non-OpenAI experts are now integrated: `open_math_prm` and
   `open_reasoning_rm`.
 - The first main heterogeneous pool has been evaluated on `dev_40, N=4`.
-- The next priority is not gate training yet; first expand to a harder `N=8`
-  candidate set so that expert routing has enough oracle gap to matter.
+- The first harder `hard_dev_100, N=8` run is complete.
+- The next priority is not blind gate training yet; first analyze mixed-candidate
+  problems and calibrate `open_math_prm` aggregation.
 
 Relation to our earlier discussions:
 
@@ -169,11 +170,68 @@ cached.
 If `hard_dev_100_n8` still has low oracle gap, the next escalation should be:
 
 ```text
-hard_dev_120_n8 or hard_dev_100_n16
+mixed_candidate analysis split, then hard_dev_120_n8 or hard_dev_100_n16
 ```
 
-Do not train the main gate until the harder split shows enough disagreement and
-oracle headroom.
+Do not train the main gate until the harder split shows enough accuracy-relevant
+expert disagreement and oracle headroom.
+
+Observed `hard_dev_100_n8` result:
+
+```text
+candidate generation tokens: 408,180
+OpenAI expert scoring tokens: 603,493
+LLM gate tokens: 38,368
+
+candidate correctness:
+overall: 534 / 800 = 0.667
+math:    254 / 480 = 0.529
+logic:   280 / 320 = 0.875
+
+problem composition:
+all-wrong:   23 / 100
+all-correct: 59 / 100
+mixed:       18 / 100
+```
+
+Main `hard_dev_100_n8` result with mean aggregation:
+
+```text
+best single expert, open_reasoning_rm: 71 / 100
+uniform_ensemble:                     70 / 100
+openai_llm_gate:                      69 / 100
+domain_rule_gate:                     67 / 100
+oracle_gate:                          71 / 100
+```
+
+After reaggregating cached `open_math_prm` step rewards with min aggregation:
+
+```text
+domain_rule_gate: 71 / 100
+uniform_ensemble: 71 / 100
+openai_llm_gate:  70 / 100
+oracle_gate:      72 / 100
+```
+
+With min aggregation plus minmax normalization:
+
+```text
+domain_rule_gate: 71 / 100
+uniform_ensemble: 70 / 100
+openai_llm_gate:  71 / 100
+oracle_gate:      72 / 100
+```
+
+Conclusion:
+
+```text
+The split is harder, but the current expert-oracle gap remains small. The next
+main work should be mixed-candidate analysis and aggregation/calibration before
+trained gate claims.
+```
+
+For reporting, treat mean aggregation as an ablation and min aggregation as the
+current preferred `open_math_prm` configuration.
 
 ## 4. Gate Design
 
@@ -368,15 +426,16 @@ Completed:
 - Skywork math PRM integrated as open_math_prm
 - Skywork Reward-V2 reasoning RM integrated as open_reasoning_rm
 - dev_40, N=4 heterogeneous pool evaluated
+- hard_dev_100, N=8 generated/scored/evaluated
 
 Current stage:
-- revised Days 5-8 are complete at small scale
-- next work starts at revised Day 9/12 boundary: create harder N=8 candidate set
-  before training/calibrating the gate
+- revised Days 5-8 are complete
+- revised Day 9 should focus on mixed-candidate oracle labels and aggregation
+  calibration before the trained gate
 
 Blocked from main MoPRM claim until:
 - no longer blocked on expert heterogeneity;
-- still blocked from strong routing claims until a harder split produces enough
+- still blocked from strong routing claims until mixed examples show enough
   oracle gap and expert complementarity
 ```
 
@@ -497,8 +556,8 @@ Deliverables:
 Status:
 
 ```text
-Complete at dev_40, N=4 scale.
-Need repeat on hard_dev_100, N=8 before reporting main results.
+Complete at dev_40, N=4 and hard_dev_100, N=8 scale.
+Current aggregation finding: open_math_prm min aggregation is better than mean.
 ```
 
 ### Day 9: Oracle Gate and Routing Labels
@@ -523,6 +582,32 @@ Before building the trained-gate dataset, run hard_dev_100_n8 and verify:
 - oracle_gate is meaningfully above best single expert/domain-rule gate;
 - experts disagree for accuracy-relevant reasons, not only tie-breaking among
   all-correct candidates.
+
+Observed result:
+
+```text
+hard_dev_100_n8 has only 18 mixed problems, and expert-oracle is only 1-2
+points above strong baselines depending on aggregation.
+```
+
+Therefore Day 9 should first build and analyze a mixed-candidate subset:
+
+```text
+include only problems with 1..N-1 correct candidates;
+report PRM@8 on this subset separately from the full split;
+use it to decide whether trained gate labels are meaningful.
+```
+
+Initial mixed-subset result after min aggregation:
+
+```text
+mixed problems: 18 / 100
+domain_rule_gate: 12 / 18
+uniform_ensemble: 12 / 18
+openai_llm_gate:  11 / 18
+best single:      12 / 18
+oracle_gate:      13 / 18
+```
 ```
 
 ### Day 10: LLM Gate Baseline on Heterogeneous Experts
@@ -569,11 +654,12 @@ Deliverables:
 Immediate command target:
 
 ```text
-hard_dev_100_n8
+hard_dev_100_n8 completed
 ```
 
-If this run is affordable and produces useful oracle gap, freeze it as the main
-course-project scale. If not, expand only one axis at a time:
+If the mixed-candidate analysis is useful, freeze hard_dev_100_n8 as the main
+course-project scale and train/calibrate on a split of those examples. If not,
+expand only one axis at a time:
 
 ```text
 Option A: hard_dev_120_n8

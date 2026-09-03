@@ -48,21 +48,27 @@ def main() -> None:
     print(f"Experts: {', '.join(experts)}")
 
     print("\n[correct candidate availability]")
-    by_domain_counts: dict[str, list[int]] = defaultdict(list)
+    by_domain_counts: dict[str, list[tuple[int, int]]] = defaultdict(list)
     for record in records:
-        by_domain_counts[record.domain].append(sum(1 for candidate in record.candidates if candidate.is_correct))
+        by_domain_counts[record.domain].append(
+            (
+                sum(1 for candidate in record.candidates if candidate.is_correct),
+                len(record.candidates),
+            )
+        )
     for domain in ["overall", *sorted(by_domain_counts)]:
-        counts = (
-            [count for values in by_domain_counts.values() for count in values]
+        count_pairs = (
+            [item for values in by_domain_counts.values() for item in values]
             if domain == "overall"
             else by_domain_counts[domain]
         )
-        if not counts:
+        if not count_pairs:
             continue
+        counts = [correct for correct, _total in count_pairs]
         print(
             f"{domain:<8} avg_correct_candidates={_fmt(_avg(counts))} "
             f"all_wrong={sum(1 for count in counts if count == 0)} "
-            f"all_correct={sum(1 for count in counts if count == 4)}"
+            f"all_correct={sum(1 for correct, total in count_pairs if correct == total)}"
         )
 
     print("\n[top-choice complementarity]")
