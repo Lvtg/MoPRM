@@ -52,20 +52,21 @@ The mixed-candidate and calibration analysis is complete:
 - the best static calibrated mixture reaches 72 / 100;
 - the mixed-subset expert oracle is 13 / 18.
 
-The hard_mix_scout_160_n8 run is also complete at candidate-generation scale:
-- 160 raw problems, 1280 candidates;
-- 43 / 160 mixed problems;
-- mixed-subset oracle reaches 41 / 43 with open_math_prm last aggregation;
-- best single expert reaches 35 / 43;
-- best static calibrated mixture reaches 38 / 43.
+The hard_mix_scout_320_n8 run is complete through mixed-subset expert scoring:
+- 320 raw problems, 2560 candidates;
+- 84 / 320 mixed problems;
+- mixed-subset oracle reaches 76 / 84;
+- best single expert reaches 67 / 84;
+- best static calibrated mixture reaches 70 / 84.
 
 Decision:
-1. keep open_math_prm step aggregation as an ablation; min was best on
-   hard_dev_100_n8, but last is better on hard_mix_scout_160_n8;
-2. keep rank normalization as the default and minmax as a sensitivity check;
-3. do not train the final gate on only 43 mixed examples;
-4. expand the same mixed-rich recipe to about 240 raw problems, or add roughly
-   80 raw problems, targeting 60+ mixed examples.
+1. use hard_mix_scout_320_n8_mixed as the first trained-gate dataset;
+2. keep open_math_prm step aggregation as an ablation; min, last, and geomean
+   win under different diagnostics;
+3. keep rank normalization as the default and minmax as a sensitivity check;
+4. train a lightweight question-level gate with a source/domain-stratified
+   split;
+5. report both full-scout candidate statistics and mixed-only PRM@8 results.
 ```
 
 ## Main Claim Boundary

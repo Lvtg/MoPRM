@@ -26,10 +26,10 @@ Current update after the September 4 mixed/calibration analysis:
 - The first main heterogeneous pool has been evaluated on `dev_40, N=4`.
 - The first harder `hard_dev_100, N=8` run is complete.
 - The mixed-candidate and calibration analysis is complete.
-- The `hard_mix_scout_160_n8` run is complete through candidate generation,
+- The `hard_mix_scout_320_n8` run is complete through candidate generation,
   mixed filtering, and mixed-subset expert scoring.
-- The next priority is to expand the mixed-rich scout to about 60+ mixed
-  examples before training the final gate.
+- The next priority is a lightweight trained question-level gate on the 84
+  mixed examples.
 
 Relation to our earlier discussions:
 
@@ -642,18 +642,19 @@ Goals:
 Status:
 
 ```text
-Completed hard_mix_scout_160_n8:
-- 160 raw problems
-- 1280 candidates
-- candidate correctness: 682 / 1280 = 0.533
-- all-wrong: 56 / 160
-- all-correct: 61 / 160
-- mixed: 43 / 160
+Completed hard_mix_scout_320_n8:
+- 320 raw problems
+- 2560 candidates
+- candidate correctness: 1379 / 2560 = 0.539
+- all-wrong: 110 / 320
+- all-correct: 126 / 320
+- mixed: 84 / 320
+- mixed sources: 61 MATH500 + 23 BBH seven-object
 ```
 
 Deliverables:
 
-- `hard_mix_scout_160` split;
+- `hard_mix_scout_320` split;
 - labeled candidate file;
 - mixed-only split;
 - source and correct-count histogram.
@@ -661,10 +662,10 @@ Deliverables:
 Recommended command target:
 
 ```text
-prepare MATH500=500, GSM8K=40, BBH per task=100;
-sample 120 MATH500 + 40 BBH seven-object examples;
-generate N=8 candidates at temperature around 1.05;
-filter to records with 1..7 correct candidates.
+completed by merging two non-overlapping 160-problem batches:
+- batch 1: 120 MATH500 + 40 BBH seven-object;
+- batch 2: 120 MATH500 + 40 BBH seven-object;
+- N=8, temperature around 1.05, eight distinct generation styles.
 ```
 
 ### Day 11: Score and Analyze Mixed-Rich Split
@@ -686,53 +687,56 @@ Deliverables:
 Status:
 
 ```text
-Completed mixed-subset scoring for 43 mixed problems.
+Completed mixed-subset scoring for 84 mixed problems.
 
 Best mixed-subset result so far:
-- open_math_prm aggregation: last
-- best single expert:        35 / 43
-- uniform ensemble:          36 / 43
-- best static mixture:       38 / 43
-- oracle gate:               41 / 43
+- best single expert:        67 / 84
+- best uniform ensemble:     66 / 84
+- best static mixture:       70 / 84
+- oracle gate:               76 / 84
 
 Math-only mixed subset:
-- best single expert:        18 / 26
-- uniform ensemble:          19 / 26
-- oracle gate:               24 / 26
+- best single expert:        44 / 61
+- best uniform ensemble:     42 / 61
+- oracle gate:               53 / 61
 
 Interpretation:
-- expert complementarity is strong enough to justify expansion;
-- 43 mixed examples are still too few for a final trained-gate claim.
+- expert complementarity is strong enough to justify trained-gate work;
+- the useful routing signal is concentrated in MATH500 mixed examples;
+- coarse domain routing is mostly solved by open_reasoning_rm on logic, so the
+  trained gate should be evaluated on whether it improves math mixed selection.
 ```
 
 ### Day 12: Trained Gate, Conditional
 
 Goals:
 
-- train question-only lightweight gate only if the mixed-rich split has enough
-  expert complementarity and oracle headroom;
-- otherwise revise candidate generation or increase `N`.
+- train a question-only lightweight gate on the 84 mixed examples;
+- use a source/domain-stratified split;
+- compare against best single, uniform ensemble, LLM gate, domain-rule gate,
+  best static calibration, and oracle gate.
 
 Deliverables:
 
-- trained gate checkpoint if justified;
-- otherwise a documented negative decision and revised data-generation plan.
+- trained gate checkpoint;
+- held-out evaluation table;
+- routing-label and feature export scripts if needed.
 
 Immediate command target:
 
 ```text
-expand hard_mix_scout_160_n8 to roughly 240 raw problems, or add about 80 raw
-problems, targeting 60+ mixed examples.
+train first question-level gate on hard_mix_scout_320_n8_mixed.
 ```
 
-If the expanded scout gives enough mixed examples, freeze it as the main
-course-project scale and train/calibrate on a train/dev split. If not, expand
-only one axis at a time:
+If the first trained gate fails to improve beyond best single/static
+calibration, keep the result as an honest negative and improve one axis at a
+time:
 
 ```text
-Option A: revise candidate generation styles / temperature
-Option B: hard_mix_scout_240_n8
-Option C: hard_mix_scout_160_n16
+Option A: use only the 61 MATH500 mixed examples for gate training/evaluation
+Option B: add aggregation choice as a gate feature or pseudo-expert
+Option C: expand to hard_mix_scout_480_n8
+Option D: hard_mix_scout_320_n16
 ```
 
 ### Day 13: Ablations

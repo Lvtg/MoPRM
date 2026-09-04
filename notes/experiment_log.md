@@ -1344,3 +1344,238 @@ Current expected gain from expansion:
 - 240 raw problems would likely give about 64 mixed problems under the same
   distribution.
 ```
+
+## 2026-09-04: hard_mix_scout_320_n8
+
+Goal:
+
+```text
+Append 160 non-overlapping raw problems using the same hard-mix recipe and
+bring the mixed-candidate pool above the threshold for trained-gate work.
+```
+
+Code updates:
+
+```text
+scripts/sample_dataset.py
+- added --exclude-input to sample a new split while excluding problem IDs from
+  previous JSONL files.
+
+src/moprm/datasets/sampling.py
+- added exclude_ids support to exact source-quota sampling and per-domain
+  sampling.
+
+scripts/merge_jsonl_records.py
+- added a small utility for merging MoPRM JSONL files with duplicate
+  problem_id checks.
+```
+
+Append split:
+
+```text
+input pool: data/cache/public_subsets/math_logic_combined.jsonl
+exclude: data/splits/hard_mix_scout_160.jsonl
+output: data/splits/hard_mix_scout_160_append1.jsonl
+quota:
+- 120 HuggingFaceH4/MATH-500
+-  40 BIG-Bench-Hard/logical_deduction_seven_objects
+seed: 31
+
+overlap with first hard_mix_scout_160 split: 0
+combined raw problems: 320
+```
+
+Append candidate generation:
+
+```text
+input: data/splits/hard_mix_scout_160_append1.jsonl
+output: data/candidates/openai_hard_mix_scout160_append1_n8.jsonl
+problems: 160
+candidates per problem: 8
+total candidates: 1280
+temperature: 1.05
+candidate styles: 8 distinct prompt styles
+reported OpenAI tokens: 734,721
+```
+
+Append correctness labeling:
+
+```text
+correct candidates: 697 / 1280 = 0.545
+all-wrong problems: 54 / 160
+all-correct problems: 65 / 160
+mixed problems: 41 / 160
+candidate upper bound: 106 / 160
+
+correct-count histogram:
+0: 54
+1: 6
+2: 6
+3: 6
+4: 2
+5: 3
+6: 8
+7: 10
+8: 65
+
+mixed sources:
+- MATH500: 35
+- BBH logical_deduction_seven_objects: 6
+```
+
+Combined 320 correctness:
+
+```text
+raw split: data/splits/hard_mix_scout_320.jsonl
+labeled:   data/cache/openai_hard_mix_scout320_n8_labeled.jsonl
+mixed:     data/splits/hard_mix_scout320_n8_mixed.jsonl
+
+raw problems: 320
+math/logic: 240 MATH500 + 80 BBH seven-object
+candidates: 2560
+correct candidates: 1379 / 2560 = 0.539
+all-wrong problems: 110 / 320
+all-correct problems: 126 / 320
+mixed problems: 84 / 320
+candidate upper bound: 210 / 320
+
+correct-count histogram:
+0: 110
+1: 10
+2: 12
+3: 11
+4: 6
+5: 9
+6: 17
+7: 19
+8: 126
+
+mixed sources:
+- MATH500: 61
+- BBH logical_deduction_seven_objects: 23
+```
+
+OpenAI/API cost for the combined 320 scout:
+
+```text
+candidate generation tokens:        1,459,205
+mixed-only OpenAI expert scoring:     618,571
+mixed-only LLM gate routing:            32,194
+```
+
+Combined mixed-subset result, mean aggregation:
+
+```text
+domain_rule_gate:               56 / 84 = 0.667
+openai_llm_gate:                60 / 84 = 0.714
+uniform_ensemble:               64 / 84 = 0.762
+single:open_math_prm:           46 / 84 = 0.548
+single:open_reasoning_rm:       67 / 84 = 0.798
+single:openai_general_judge:    63 / 84 = 0.750
+single:openai_reflective_judge: 66 / 84 = 0.786
+oracle_gate:                    76 / 84 = 0.905
+```
+
+Combined mixed-subset result, min aggregation:
+
+```text
+domain_rule_gate:               50 / 84 = 0.595
+openai_llm_gate:                58 / 84 = 0.690
+uniform_ensemble:               63 / 84 = 0.750
+single:open_math_prm:           45 / 84 = 0.536
+single:open_reasoning_rm:       67 / 84 = 0.798
+single:openai_general_judge:    63 / 84 = 0.750
+single:openai_reflective_judge: 66 / 84 = 0.786
+oracle_gate:                    74 / 84 = 0.881
+```
+
+Combined mixed-subset result, last aggregation:
+
+```text
+domain_rule_gate:               53 / 84 = 0.631
+openai_llm_gate:                57 / 84 = 0.679
+uniform_ensemble:               65 / 84 = 0.774
+single:open_math_prm:           44 / 84 = 0.524
+single:open_reasoning_rm:       67 / 84 = 0.798
+single:openai_general_judge:    63 / 84 = 0.750
+single:openai_reflective_judge: 66 / 84 = 0.786
+oracle_gate:                    76 / 84 = 0.905
+
+math only:
+best single expert:             44 / 61 = 0.721
+best uniform ensemble:          42 / 61 = 0.689
+oracle_gate:                    53 / 61 = 0.869
+
+logic only:
+open_reasoning_rm/domain/uniform/oracle all reach 23 / 23.
+```
+
+Aggregation and calibration sweep on the combined mixed subset:
+
+```text
+best single expert:
+open_reasoning_rm:              67 / 84 = 0.798
+
+best uniform ensemble:
+geomean + rank:                 66 / 84 = 0.786
+
+best static calibrated mixture:
+min + rank:                     70 / 84 = 0.833
+weights: open_math_prm 0.2 + open_reasoning_rm 0.7 + openai_general_judge 0.1
+
+best oracle:
+mean/last/geomean:              76 / 84 = 0.905
+```
+
+Expert complementarity diagnostics:
+
+```text
+mean aggregation:
+all_experts_success: 36 / 84
+no_expert_success:    7 / 84
+unique_success:
+- open_math_prm:            2
+- open_reasoning_rm:        3
+- openai_general_judge:     0
+- openai_reflective_judge:  3
+
+min aggregation:
+all_experts_success: 39 / 84
+no_expert_success:    8 / 84
+unique_success:
+- open_math_prm:            1
+- open_reasoning_rm:        4
+- openai_general_judge:     1
+- openai_reflective_judge:  3
+
+last aggregation:
+all_experts_success: 33 / 84
+no_expert_success:    7 / 84
+unique_success:
+- open_math_prm:            2
+- open_reasoning_rm:        2
+- openai_general_judge:     0
+- openai_reflective_judge:  3
+```
+
+Decision:
+
+```text
+The project now has enough mixed examples to train the first lightweight gate.
+
+Why:
+- mixed examples reached 84 / 320, above the 60+ target;
+- oracle is 76 / 84, clearly above best single 67 / 84 and best uniform 66 / 84;
+- best static calibration reaches 70 / 84, proving that nontrivial score fusion
+  can already beat any single expert on this split.
+
+Main caveat:
+- logic mixed examples are basically solved by open_reasoning_rm;
+- the real routing challenge is MATH500 mixed selection.
+
+Next:
+- build a train/dev split over hard_mix_scout320_n8_mixed;
+- train a question-level gate;
+- report held-out PRM@8 against best single, uniform, LLM gate, static
+  calibration, and oracle.
+```

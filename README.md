@@ -62,10 +62,9 @@ best single expert            71 / 100 = 0.710  # open_reasoning_rm
 oracle_gate                   72 / 100 = 0.720
 ```
 
-Interpretation: the harder `N=8` run is much more useful than `dev_40`, but the
-current split still has limited routing headroom. Mixed-candidate and
-calibration analysis shows that we should not train the main gate yet; the next
-experiment should first create a more selection-informative, mixed-rich split.
+Interpretation at this stage: the harder `N=8` run was much more useful than
+`dev_40`, but `hard_dev_100_n8` still had limited routing headroom. This led to
+the later mixed-rich scout splits below.
 
 `hard_dev_100_n8` diagnostic finding:
 
@@ -77,9 +76,8 @@ best calibrated static mixture:  72 / 100 full, 13 / 18 mixed
 best static weights:             open_math_prm + openai_reflective_judge
 ```
 
-The current oracle gap is real but small. This is a useful diagnostic result:
-the bottleneck is not merely the gate, but candidate-set composition and expert
-calibration.
+The oracle gap was real but small. This diagnostic showed that the bottleneck
+was not merely the gate, but candidate-set composition and expert calibration.
 
 ## Current Scope
 
@@ -190,30 +188,32 @@ python scripts/run_smoke_eval.py --input data/scored/openai_hard_dev100_n8_two_o
 python scripts/analyze_expert_pool.py --input data/scored/openai_hard_dev100_n8_two_open_expert_pool_routed_math_min.jsonl
 ```
 
-## Latest Scout: `hard_mix_scout_160_n8`
+## Latest Scout: `hard_mix_scout_320_n8`
 
-Completed on 2026-09-04 with eight distinct candidate-generation styles:
+Completed on 2026-09-04 by appending a non-overlapping 160-problem batch to
+`hard_mix_scout_160_n8`. Both batches use eight distinct candidate-generation
+styles.
 
 ```text
-split: 120 MATH500 + 40 BBH logical_deduction_seven_objects
-candidates: 160 x 8 = 1280
-candidate generation tokens: 724,484
-OpenAI expert scoring tokens for mixed subset only: 332,906
-LLM gate tokens for mixed subset: 17,245
+split: 240 MATH500 + 80 BBH logical_deduction_seven_objects
+candidates: 320 x 8 = 2560
+candidate generation tokens: 1,459,205
+OpenAI expert scoring tokens for mixed subset only: 618,571
+LLM gate tokens for mixed subset: 32,194
 ```
 
 Candidate correctness:
 
 ```text
-correct candidates: 682 / 1280 = 0.533
-all-wrong problems: 56 / 160
-all-correct problems: 61 / 160
-mixed problems: 43 / 160
-candidate upper bound: 104 / 160
+correct candidates: 1379 / 2560 = 0.539
+all-wrong problems: 110 / 320
+all-correct problems: 126 / 320
+mixed problems: 84 / 320
+candidate upper bound: 210 / 320
 
 mixed sources:
-- MATH500: 26
-- BBH seven-object: 17
+- MATH500: 61
+- BBH seven-object: 23
 ```
 
 Mixed-subset result with the main heterogeneous expert pool:
@@ -225,30 +225,30 @@ experts:
 - openai_general_judge
 - openai_reflective_judge
 
-best single expert:        35 / 43 = 0.814  # open_reasoning_rm
-uniform, math PRM last:    36 / 43 = 0.837
-best static mixture:       38 / 43 = 0.884
-oracle, math PRM last:     41 / 43 = 0.953
+best single expert:        67 / 84 = 0.798  # open_reasoning_rm
+best uniform ensemble:     66 / 84 = 0.786  # open_math_prm geomean + rank
+best static mixture:       70 / 84 = 0.833  # open_math_prm min + rank
+oracle gate:               76 / 84 = 0.905
 ```
 
 Interpretation: this scout split is much more selection-informative than
-`hard_dev_100_n8`. The mixed count is still below the target for trained-gate
-claims, but the oracle gap is now large enough to justify expanding the same
-recipe.
+`hard_dev_100_n8`. The mixed count now exceeds the target for a lightweight
+trained-gate experiment, and the oracle gap is large enough to make routing
+meaningful.
 
 ## Next Step
 
 Current decision:
 
-1. Do not train the final gate on only 43 mixed examples.
-2. Keep `open_math_prm` step aggregation as an ablation. `min` was best on
-   `hard_dev_100_n8`, but `last` is better on `hard_mix_scout_160_n8`.
+1. Use `hard_mix_scout_320_n8_mixed` as the first trained-gate dataset.
+2. Keep `open_math_prm` step aggregation as an ablation. `min`, `last`, and
+   `geomean` each win under different diagnostics, so aggregation should be a
+   reported choice rather than a hidden constant.
 3. Use rank normalization for the main table and minmax as a calibration
    sensitivity check.
-4. Expand the scout recipe to about 240 raw problems, or add roughly 80 more
-   raw problems, to target 60+ mixed examples.
-5. Once mixed examples reach roughly 60+ and oracle remains clearly above
-   best-single/uniform routing, train a question-level gate.
+4. Train a small question-level gate on the 84 mixed problems, with a
+   source/domain-stratified split.
+5. Report both full-scout candidate statistics and mixed-only PRM@8 results.
 
 ## Local Smoke Test
 
