@@ -3,6 +3,9 @@ name = "moprm"
 version = "0.1.0"
 description = "Router-guided mixtures of process reward models for reasoning tasks."
 requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+]
 
 [project.optional-dependencies]
 local-prm = [

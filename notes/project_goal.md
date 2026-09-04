@@ -60,13 +60,14 @@ The hard_mix_scout_320_n8 run is complete through mixed-subset expert scoring:
 - best static calibrated mixture reaches 70 / 84.
 
 Decision:
-1. use hard_mix_scout_320_n8_mixed as the first trained-gate dataset;
-2. keep open_math_prm step aggregation as an ablation; min, last, and geomean
-   win under different diagnostics;
-3. keep rank normalization as the default and minmax as a sensitivity check;
-4. train a lightweight question-level gate with a source/domain-stratified
-   split;
-5. report both full-scout candidate statistics and mixed-only PRM@8 results.
+1. Gate-v1 is implemented as the first trained question-level router;
+2. Gate-v1 uses 5-fold source/domain-stratified CV on hard_mix_scout_320_n8_mixed;
+3. best Gate-v1 reaches 67 / 84, matching the best single expert and beating
+   uniform/domain/LLM routing in that setting;
+4. the strongest CV-static calibration still reaches 69 / 84, so Gate-v1 is a
+   trained-router baseline rather than the final winning method;
+5. next work should target Gate-v2 candidate-aware features, math-only routing,
+   aggregation-aware routing, or a larger hard_mix_scout_480_n8 split.
 ```
 
 ## Main Claim Boundary
@@ -78,6 +79,12 @@ Safe current claim:
 Final claim, only after the harder split supports it:
 
 > MoPRM can exploit specialization among heterogeneous PRM/reward experts through routing, improving or matching Best-of-N selection while exposing accuracy-cost tradeoffs.
+
+Current Gate-v1 claim:
+
+> A lightweight trained question-level router can match the best single expert
+> and outperform uniform/domain/LLM routing on the mixed-rich scout subset, but
+> stronger routing features are needed to beat static calibration.
 
 Claim to avoid:
 

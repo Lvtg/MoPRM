@@ -28,8 +28,10 @@ Current update after the September 4 mixed/calibration analysis:
 - The mixed-candidate and calibration analysis is complete.
 - The `hard_mix_scout_320_n8` run is complete through candidate generation,
   mixed filtering, and mixed-subset expert scoring.
-- The next priority is a lightweight trained question-level gate on the 84
-  mixed examples.
+- Gate-v1, a lightweight trained question-level router, is implemented and
+  evaluated with 5-fold source/domain-stratified CV on the 84 mixed examples.
+- Gate-v1 is now the trained-router baseline; the next priority is improving
+  beyond question-only routing or expanding data.
 
 Relation to our earlier discussions:
 
@@ -722,21 +724,53 @@ Deliverables:
 - held-out evaluation table;
 - routing-label and feature export scripts if needed.
 
-Immediate command target:
+Status:
 
 ```text
-train first question-level gate on hard_mix_scout_320_n8_mixed.
+Completed Gate-v1:
+- multi-label logistic question-level gate;
+- source/domain-stratified 5-fold CV;
+- out-of-fold metadata gate records;
+- comparison against best single, uniform, domain-rule, LLM gate, CV-static
+  calibration, and oracle.
 ```
 
-If the first trained gate fails to improve beyond best single/static
-calibration, keep the result as an honest negative and improve one axis at a
-time:
+Best Gate-v1 result:
 
 ```text
-Option A: use only the 61 MATH500 mixed examples for gate training/evaluation
-Option B: add aggregation choice as a gate feature or pseudo-expert
-Option C: expand to hard_mix_scout_480_n8
-Option D: hard_mix_scout_320_n16
+setting: open_math_prm mean aggregation + rank normalization + weight_power=4
+
+Gate-v1 CV:             67 / 84 = 0.798
+best single expert:     67 / 84 = 0.798
+uniform ensemble:       64 / 84 = 0.762
+domain-rule gate:       56 / 84 = 0.667
+OpenAI LLM gate:        60 / 84 = 0.714
+expert oracle:          76 / 84 = 0.905
+```
+
+Current limitation:
+
+```text
+Gate-v1 does not yet beat the strongest cross-validated static calibration.
+
+Best CV-static setting:
+open_math_prm min aggregation + rank normalization
+CV static calibration:  69 / 84 = 0.821
+Gate-v1 CV:             63 / 84 = 0.750 under the same aggregation
+```
+
+Decision:
+
+```text
+Keep Gate-v1 as the trained baseline. It improves over uniform/domain/LLM
+routing in the best setting, but the next method should improve one axis at a
+time rather than overclaim.
+
+Option A: Gate-v2 candidate-aware features, including expert score-shape
+Option B: math-only gate on the 61 MATH500 mixed examples
+Option C: aggregation-aware gate, treating open_math_prm aggregation variants
+          as pseudo-experts or predicting aggregation
+Option D: expand to hard_mix_scout_480_n8 if more training data is needed
 ```
 
 ### Day 13: Ablations

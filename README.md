@@ -18,8 +18,14 @@ The current OpenAI scorer is intentionally treated as an **OpenAI multi-rubric j
 
 ## Current Status
 
-As of 2026-09-04, the main heterogeneous expert pool has been run at
-`hard_dev_100, N=8` scale:
+As of 2026-09-04, the project has:
+
+- integrated the main heterogeneous expert pool;
+- run `hard_dev_100, N=8` as the first harder full split;
+- expanded to `hard_mix_scout_320_n8`, producing 84 mixed candidate sets;
+- implemented and evaluated Gate-v1, the first trained question-level router.
+
+Main expert pool:
 
 | Expert name | Source | Score type |
 |---|---|---|
@@ -236,19 +242,83 @@ Interpretation: this scout split is much more selection-informative than
 trained-gate experiment, and the oracle gap is large enough to make routing
 meaningful.
 
+## Gate-v1: Lightweight Trained Router
+
+Implemented on 2026-09-04:
+
+| Component | Choice |
+|---|---|
+| Gate model | multi-label logistic regression |
+| Features | question text hashes + lightweight metadata/text statistics |
+| Labels | whether each expert's own top-ranked candidate is correct |
+| Split | 5-fold source/domain-stratified cross-validation |
+| Evaluation | out-of-fold `metadata_gate:trained_gate_v1_cv` weights |
+
+Gate-v1 deliberately avoids large-model training. It learns a question-level
+distribution over the four heterogeneous experts and writes out-of-fold weights
+back into `record.metadata.gate_weights.trained_gate_v1_cv`, so the existing
+MoPRM evaluator can score it exactly like the LLM gate.
+
+Current Gate-v1 command:
+
+```bash
+python scripts/train_gate_v1.py \
+  --input data/scored/openai_hard_mix_scout320_n8_mixed_pool_routed.jsonl \
+  --output-dir data/scored/gate_v1_p4 \
+  --math-aggregations mean,min,last,geomean \
+  --normalization rank \
+  --folds 5 \
+  --seed 41 \
+  --hash-dim 256 \
+  --epochs 800 \
+  --lr 0.05 \
+  --l2 0.01 \
+  --weight-power 4 \
+  --grid-step 0.1
+```
+
+Main mixed-only CV result:
+
+```text
+best Gate-v1 setting: mean aggregation + rank normalization + weight_power=4
+
+Gate-v1 CV:                 67 / 84 = 0.798
+CV static calibration:      67 / 84 = 0.798
+best single expert:         67 / 84 = 0.798  # open_reasoning_rm
+uniform ensemble:           64 / 84 = 0.762
+domain-rule gate:           56 / 84 = 0.667
+OpenAI LLM gate:            60 / 84 = 0.714
+expert oracle:              76 / 84 = 0.905
+```
+
+Best calibration diagnostic remains:
+
+```text
+open_math_prm min aggregation + rank normalization + CV static calibration
+CV static calibration:      69 / 84 = 0.821
+Gate-v1 CV:                 63 / 84 = 0.750
+```
+
+Interpretation: Gate-v1 is now a working trained-router baseline and improves
+over uniform/domain/LLM routing in its best setting, but it does not yet beat
+the strongest cross-validated static calibration. This is a useful boundary:
+the next research step should make the gate less purely question-level, or give
+it better labels/features, rather than only claiming that a learned gate already
+wins.
+
 ## Next Step
 
-Current decision:
+Current decision after Gate-v1:
 
-1. Use `hard_mix_scout_320_n8_mixed` as the first trained-gate dataset.
-2. Keep `open_math_prm` step aggregation as an ablation. `min`, `last`, and
-   `geomean` each win under different diagnostics, so aggregation should be a
-   reported choice rather than a hidden constant.
-3. Use rank normalization for the main table and minmax as a calibration
-   sensitivity check.
-4. Train a small question-level gate on the 84 mixed problems, with a
-   source/domain-stratified split.
-5. Report both full-scout candidate statistics and mixed-only PRM@8 results.
+1. Keep Gate-v1 as the trained question-level baseline.
+2. Report `weight_power=4` as the current best Gate-v1 setting and include
+   `weight_power=1/2/8` as a small sharpness ablation if space allows.
+3. Keep `open_math_prm` step aggregation as an ablation; `mean` is best for
+   Gate-v1, while `min` is best for CV static calibration.
+4. Next improve the gate on one axis: add candidate-aware features, train on
+   math-mixed only, or expand to a larger `hard_mix_scout_480_n8` split.
+5. Do not overclaim yet: Gate-v1 beats uniform/domain/LLM routing, but the
+   strongest CV-static mixture is still better.
 
 ## Local Smoke Test
 

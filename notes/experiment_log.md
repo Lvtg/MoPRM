@@ -1579,3 +1579,168 @@ Next:
 - report held-out PRM@8 against best single, uniform, LLM gate, static
   calibration, and oracle.
 ```
+
+## 2026-09-04: Gate-v1 Trained Question-Level Router
+
+Goal:
+
+```text
+Build the first trainable MoPRM router on hard_mix_scout_320_n8_mixed and
+evaluate it with out-of-fold predictions rather than in-sample routing.
+```
+
+Implementation added:
+
+```text
+src/moprm/trained_gate.py
+- deterministic question-level feature extraction;
+- source/domain/task metadata features;
+- numeric text statistics;
+- hashed unigram/bigram problem-text features;
+- multi-label logistic regression trained with NumPy/Adam;
+- source/domain-stratified K-fold splitting;
+- utility to attach trained gate weights into record.metadata.gate_weights.
+
+scripts/train_gate_v1.py
+- trains Gate-v1 with 5-fold CV;
+- writes out-of-fold metadata-gate records;
+- compares Gate-v1 against best single, uniform, domain-rule, OpenAI LLM gate,
+  expert oracle, and cross-validated static calibration.
+
+tests/test_trained_gate.py
+- validates feature determinism, expert-success labels, stratified folds, and
+  basic learned routing behavior.
+```
+
+Training label:
+
+```text
+For each problem and expert, label the expert as positive if that expert's
+own top-ranked candidate is correct under the chosen normalization.
+```
+
+This gives Gate-v1 a multi-label target because several experts can be
+successful on the same problem.
+
+Verification:
+
+```text
+python -m unittest discover -s tests
+53 tests OK
+```
+
+Main command:
+
+```bash
+python scripts/train_gate_v1.py \
+  --input data/scored/openai_hard_mix_scout320_n8_mixed_pool_routed.jsonl \
+  --output-dir data/scored/gate_v1_p4 \
+  --math-aggregations mean,min,last,geomean \
+  --normalization rank \
+  --folds 5 \
+  --seed 41 \
+  --hash-dim 256 \
+  --epochs 800 \
+  --lr 0.05 \
+  --l2 0.01 \
+  --weight-power 4 \
+  --grid-step 0.1
+```
+
+Gate sharpness sweep:
+
+```text
+weight_power=1:
+- mean aggregation:    Gate-v1 65 / 84 = 0.774
+- geomean aggregation: Gate-v1 65 / 84 = 0.774
+
+weight_power=2:
+- mean aggregation:    Gate-v1 66 / 84 = 0.786
+- geomean aggregation: Gate-v1 66 / 84 = 0.786
+
+weight_power=4:
+- mean aggregation:    Gate-v1 67 / 84 = 0.798
+- geomean aggregation: Gate-v1 66 / 84 = 0.786
+
+weight_power=8:
+- mean aggregation:    Gate-v1 65 / 84 = 0.774
+- geomean aggregation: Gate-v1 64 / 84 = 0.762
+```
+
+Best Gate-v1 result:
+
+```text
+setting: mean aggregation + rank normalization + weight_power=4
+
+overall mixed:
+Gate-v1 CV:                 67 / 84 = 0.798
+CV static calibration:      67 / 84 = 0.798
+best single expert:         67 / 84 = 0.798  # open_reasoning_rm
+uniform ensemble:           64 / 84 = 0.762
+domain-rule gate:           56 / 84 = 0.667
+OpenAI LLM gate:            60 / 84 = 0.714
+expert oracle:              76 / 84 = 0.905
+
+math mixed:
+Gate-v1 CV:                 44 / 61 = 0.721
+CV static calibration:      44 / 61 = 0.721
+best single expert:         44 / 61 = 0.721  # openai_reflective_judge
+uniform ensemble:           41 / 61 = 0.672
+domain-rule gate:           33 / 61 = 0.541
+OpenAI LLM gate:            37 / 61 = 0.607
+expert oracle:              53 / 61 = 0.869
+
+logic mixed:
+Gate-v1 CV:                 23 / 23 = 1.000
+open_reasoning_rm/domain/uniform/LLM/oracle all reach 23 / 23.
+```
+
+Strongest cross-validated static calibration:
+
+```text
+setting: open_math_prm min aggregation + rank normalization
+
+overall mixed:
+CV static calibration:      69 / 84 = 0.821
+Gate-v1 CV:                 63 / 84 = 0.750
+best single expert:         67 / 84 = 0.798
+uniform ensemble:           63 / 84 = 0.750
+expert oracle:              74 / 84 = 0.881
+
+learned per-fold static weights usually concentrate on:
+open_math_prm 0.2 + open_reasoning_rm 0.7/0.8 + sometimes openai_general_judge 0.1
+```
+
+Interpretation:
+
+```text
+Gate-v1 is a useful trained-router baseline, not yet the final winning method.
+
+What works:
+- it is fully reproducible and cheap;
+- it beats uniform/domain/LLM routing in its best setting;
+- it reaches the best single expert under mean aggregation;
+- it gives us a clean paper-ready negative/diagnostic if needed.
+
+What does not work yet:
+- the question-only gate does not beat the strongest CV-static calibration;
+- average weights remain close to a soft ensemble and only mildly favor
+  open_reasoning_rm;
+- logic mixed examples are already solved, so the real challenge is math mixed
+  selection.
+```
+
+Decision:
+
+```text
+Keep Gate-v1 as the trained baseline.
+
+Next improvement should be one of:
+1. candidate-aware Gate-v2: add candidate/expert score-shape features, not only
+   problem text;
+2. math-only gate: train/evaluate on the 61 MATH500 mixed examples where the
+   oracle gap is large;
+3. aggregation-aware gate: treat open_math_prm mean/min/last/geomean as
+   separate pseudo-experts or add aggregation choice as a predicted variable;
+4. expand to hard_mix_scout_480_n8 if more training data is needed.
+```
