@@ -41,10 +41,14 @@ def sample_records_by_source_quotas(
     records: list[ProblemRecord],
     quotas: list[SourceQuota],
     seed: int = 13,
+    exclude_ids: set[str] | None = None,
 ) -> list[ProblemRecord]:
     rng = random.Random(seed)
+    excluded = exclude_ids or set()
     by_key: dict[tuple[str, str], list[ProblemRecord]] = defaultdict(list)
     for record in records:
+        if record.problem_id in excluded:
+            continue
         source = str(record.metadata.get("source", ""))
         by_key[(record.domain, source)].append(record)
 
@@ -71,7 +75,11 @@ def sample_records(
     limit: int | None = None,
     per_domain: int | None = None,
     seed: int = 13,
+    exclude_ids: set[str] | None = None,
 ) -> list[ProblemRecord]:
+    excluded = exclude_ids or set()
+    records = [record for record in records if record.problem_id not in excluded]
+
     if limit is None and per_domain is None:
         return list(records)
 

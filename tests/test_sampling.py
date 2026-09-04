@@ -67,6 +67,44 @@ class SamplingTest(unittest.TestCase):
             2,
         )
 
+    def test_source_quota_sample_excludes_problem_ids(self) -> None:
+        records = [
+            make_record("math500_1", "math", "MATH500"),
+            make_record("math500_2", "math", "MATH500"),
+            make_record("math500_3", "math", "MATH500"),
+            make_record("logic_1", "logic", "BBH"),
+            make_record("logic_2", "logic", "BBH"),
+        ]
+        sampled = sample_records_by_source_quotas(
+            records,
+            [
+                ("math", "MATH500", 2),
+                ("logic", "BBH", 1),
+            ],
+            seed=1,
+            exclude_ids={"math500_1", "logic_1"},
+        )
+
+        self.assertEqual(len(sampled), 3)
+        self.assertNotIn("math500_1", {record.problem_id for record in sampled})
+        self.assertNotIn("logic_1", {record.problem_id for record in sampled})
+
+    def test_per_domain_sample_excludes_problem_ids(self) -> None:
+        records = [
+            make_record("m1", "math"),
+            make_record("m2", "math"),
+            make_record("l1", "logic"),
+            make_record("l2", "logic"),
+        ]
+        sampled = sample_records(
+            records,
+            per_domain=1,
+            seed=1,
+            exclude_ids={"m1", "l1"},
+        )
+
+        self.assertEqual({record.problem_id for record in sampled}, {"m2", "l2"})
+
     def test_source_quota_raises_when_pool_too_small(self) -> None:
         records = [make_record("math500_1", "math", "MATH500")]
         with self.assertRaises(ValueError):

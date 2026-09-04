@@ -12,6 +12,14 @@ from moprm.datasets.sampling import parse_source_quota, sample_records, sample_r
 from moprm.io import load_jsonl, write_jsonl
 
 
+def load_excluded_problem_ids(paths: list[str]) -> set[str]:
+    excluded: set[str] = set()
+    for path_text in paths:
+        for record in load_jsonl(Path(path_text)):
+            excluded.add(record.problem_id)
+    return excluded
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Sample a reproducible MoPRM dataset split.")
     parser.add_argument("--input", required=True)
@@ -27,6 +35,15 @@ def main() -> None:
             "Can be repeated, e.g. --source-quota math|HuggingFaceH4/MATH-500=50."
         ),
     )
+    parser.add_argument(
+        "--exclude-input",
+        action="append",
+        default=[],
+        help=(
+            "Exclude problem IDs appearing in this JSONL before sampling. "
+            "Can be repeated to avoid overlap with previous splits."
+        ),
+    )
     parser.add_argument("--seed", type=int, default=13)
     args = parser.parse_args()
 
@@ -36,9 +53,15 @@ def main() -> None:
         raise ValueError("Use either --source-quota or --per-domain, not both")
 
     records = load_jsonl(Path(args.input))
+    exclude_ids = load_excluded_problem_ids(args.exclude_input)
     if args.source_quota:
         quotas = [parse_source_quota(item) for item in args.source_quota]
-        sampled = sample_records_by_source_quotas(records, quotas, seed=args.seed)
+        sampled = sample_records_by_source_quotas(
+            records,
+            quotas,
+            seed=args.seed,
+            exclude_ids=exclude_ids,
+        )
         if args.limit is not None:
             sampled = sampled[: args.limit]
     else:
@@ -47,6 +70,7 @@ def main() -> None:
             limit=args.limit,
             per_domain=args.per_domain,
             seed=args.seed,
+            exclude_ids=exclude_ids,
         )
     write_jsonl(Path(args.output), [record.to_dict() for record in sampled])
     counts = Counter(record.domain for record in sampled)
@@ -54,6 +78,8 @@ def main() -> None:
         f"{record.domain}|{record.metadata.get('source', '')}" for record in sampled
     )
     print(f"Sampled {len(sampled)} records from {args.input}")
+    if exclude_ids:
+        print(f"Excluded {len(exclude_ids)} problem IDs before sampling")
     print(f"Domains: {dict(counts)}")
     print(f"Sources: {dict(source_counts)}")
     print(f"Wrote {args.output}")
