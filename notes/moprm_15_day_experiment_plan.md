@@ -26,8 +26,10 @@ Current update after the September 4 mixed/calibration analysis:
 - The first main heterogeneous pool has been evaluated on `dev_40, N=4`.
 - The first harder `hard_dev_100, N=8` run is complete.
 - The mixed-candidate and calibration analysis is complete.
-- The next priority is a larger mixed-rich scout split, not blind trained-gate
-  fitting.
+- The `hard_mix_scout_160_n8` run is complete through candidate generation,
+  mixed filtering, and mixed-subset expert scoring.
+- The next priority is to expand the mixed-rich scout to about 60+ mixed
+  examples before training the final gate.
 
 Relation to our earlier discussions:
 
@@ -637,6 +639,18 @@ Goals:
 - filter problems with 1..7 correct candidates;
 - check whether the mixed subset reaches roughly 60+ problems.
 
+Status:
+
+```text
+Completed hard_mix_scout_160_n8:
+- 160 raw problems
+- 1280 candidates
+- candidate correctness: 682 / 1280 = 0.533
+- all-wrong: 56 / 160
+- all-correct: 61 / 160
+- mixed: 43 / 160
+```
+
 Deliverables:
 
 - `hard_mix_scout_160` split;
@@ -669,6 +683,28 @@ Deliverables:
 - expert complementarity diagnostics;
 - decision on whether gate training is justified.
 
+Status:
+
+```text
+Completed mixed-subset scoring for 43 mixed problems.
+
+Best mixed-subset result so far:
+- open_math_prm aggregation: last
+- best single expert:        35 / 43
+- uniform ensemble:          36 / 43
+- best static mixture:       38 / 43
+- oracle gate:               41 / 43
+
+Math-only mixed subset:
+- best single expert:        18 / 26
+- uniform ensemble:          19 / 26
+- oracle gate:               24 / 26
+
+Interpretation:
+- expert complementarity is strong enough to justify expansion;
+- 43 mixed examples are still too few for a final trained-gate claim.
+```
+
 ### Day 12: Trained Gate, Conditional
 
 Goals:
@@ -685,10 +721,11 @@ Deliverables:
 Immediate command target:
 
 ```text
-hard_mix_scout_160_n8
+expand hard_mix_scout_160_n8 to roughly 240 raw problems, or add about 80 raw
+problems, targeting 60+ mixed examples.
 ```
 
-If `hard_mix_scout_160_n8` gives enough mixed examples, freeze it as the main
+If the expanded scout gives enough mixed examples, freeze it as the main
 course-project scale and train/calibrate on a train/dev split. If not, expand
 only one axis at a time:
 

@@ -1167,3 +1167,180 @@ success criterion:
   mixed problems >= about 60
   expert oracle clearly above best single and uniform routing
 ```
+
+## 2026-09-04: hard_mix_scout_160_n8
+
+Goal:
+
+```text
+Create a harder, mixed-candidate-rich scout split with N=8 and eight distinct
+candidate-generation styles, then decide whether trained-gate work is justified.
+```
+
+Data preparation:
+
+```text
+Prepared public subsets:
+- MATH500: 500
+- GSM8K: 40
+- BBH logical deduction: 300, 100 per task
+
+Sampled split:
+- 120 HuggingFaceH4/MATH-500
+-  40 BIG-Bench-Hard/logical_deduction_seven_objects
+```
+
+Candidate generation:
+
+```text
+input: data/splits/hard_mix_scout_160.jsonl
+output: data/candidates/openai_hard_mix_scout160_n8.jsonl
+problems: 160
+candidates per problem: 8
+total candidates: 1280
+temperature: 1.05
+candidate styles: 8 distinct prompt styles
+reported OpenAI tokens: 724,484
+```
+
+Correctness labeling:
+
+```text
+labeled output: data/cache/openai_hard_mix_scout160_n8_labeled.jsonl
+correct candidates: 682 / 1280 = 0.533
+all-wrong problems: 56 / 160
+all-correct problems: 61 / 160
+mixed problems: 43 / 160
+candidate upper bound: 104 / 160
+
+correct-count histogram:
+0: 56
+1: 4
+2: 6
+3: 5
+4: 4
+5: 6
+6: 9
+7: 9
+8: 61
+
+mixed sources:
+- MATH500: 26
+- BBH logical_deduction_seven_objects: 17
+```
+
+Decision after labeling:
+
+```text
+The split is harder than hard_dev_100_n8:
+- candidate correctness drops from 0.667 to 0.533;
+- mixed examples improve from 18 / 100 to 43 / 160.
+
+The mixed count is still below the target of roughly 60+ for trained-gate
+claims, but it is high enough to score the mixed subset and inspect expert
+complementarity.
+```
+
+Mixed subset expert scoring:
+
+```text
+input: data/splits/hard_mix_scout160_n8_mixed.jsonl
+problems: 43
+candidates: 344
+
+OpenAI expert scoring tokens: 332,906
+LLM gate tokens: 17,245
+
+open-source experts:
+- open_math_prm, Skywork-o1-Open-PRM-Qwen-2.5-1.5B, local CUDA
+- open_reasoning_rm, Skywork-Reward-V2-Qwen3-1.7B, local CUDA
+```
+
+Mixed subset result, `open_math_prm` mean aggregation:
+
+```text
+domain_rule_gate:               32 / 43 = 0.744
+openai_llm_gate:                32 / 43 = 0.744
+uniform_ensemble:               33 / 43 = 0.767
+single:open_math_prm:           26 / 43 = 0.605
+single:open_reasoning_rm:       35 / 43 = 0.814
+single:openai_general_judge:    31 / 43 = 0.721
+single:openai_reflective_judge: 33 / 43 = 0.767
+oracle_gate:                    40 / 43 = 0.930
+```
+
+Mixed subset result, `open_math_prm` min aggregation:
+
+```text
+domain_rule_gate:               27 / 43 = 0.628
+openai_llm_gate:                31 / 43 = 0.721
+uniform_ensemble:               34 / 43 = 0.791
+single:open_math_prm:           24 / 43 = 0.558
+single:open_reasoning_rm:       35 / 43 = 0.814
+single:openai_reflective_judge: 33 / 43 = 0.767
+oracle_gate:                    40 / 43 = 0.930
+```
+
+Mixed subset result, `open_math_prm` last aggregation:
+
+```text
+rank normalization:
+domain_rule_gate:               33 / 43 = 0.767
+openai_llm_gate:                33 / 43 = 0.767
+uniform_ensemble:               36 / 43 = 0.837
+single:open_math_prm:           27 / 43 = 0.628
+single:open_reasoning_rm:       35 / 43 = 0.814
+single:openai_reflective_judge: 33 / 43 = 0.767
+oracle_gate:                    41 / 43 = 0.953
+
+math only:
+uniform_ensemble:               19 / 26 = 0.731
+single:open_reasoning_rm:       18 / 26 = 0.692
+oracle_gate:                    24 / 26 = 0.923
+
+logic only:
+open_reasoning_rm/domain/uniform/oracle all reach 17 / 17.
+```
+
+Aggregation and calibration sweep:
+
+```text
+Best static mixture on mixed subset:
+- mean/rank: 36 / 43, open_math_prm 0.2 + open_reasoning_rm 0.8
+- min/rank:  37 / 43, open_math_prm 0.2 + open_reasoning_rm 0.8
+- last/rank: 38 / 43, open_math_prm 0.4 + openai_general_judge 0.5 + openai_reflective_judge 0.1
+
+Best oracle:
+- last aggregation reaches 41 / 43.
+```
+
+Interpretation:
+
+```text
+This scout succeeded at creating useful routing signal, but not enough mixed
+examples yet for a confident trained-gate result.
+
+Important change from the previous hard_dev_100_n8 finding:
+- min aggregation was strongest on hard_dev_100_n8;
+- last aggregation is strongest on this mixed scout.
+
+Therefore, open_math_prm step aggregation should remain an ablation or a
+calibrated choice, not a fixed assumption.
+```
+
+Next plan:
+
+```text
+Do not train the final gate on only 43 mixed examples.
+
+Recommended next step:
+- expand the same recipe to about 240 raw problems, or add roughly 80 more raw
+  problems, targeting 60+ mixed examples;
+- score only the resulting mixed subset first;
+- if the oracle gap remains large, train a question-level gate.
+
+Current expected gain from expansion:
+- observed mixed rate: 43 / 160 = 26.9%;
+- 240 raw problems would likely give about 64 mixed problems under the same
+  distribution.
+```

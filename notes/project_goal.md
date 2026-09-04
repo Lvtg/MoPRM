@@ -52,12 +52,20 @@ The mixed-candidate and calibration analysis is complete:
 - the best static calibrated mixture reaches 72 / 100;
 - the mixed-subset expert oracle is 13 / 18.
 
+The hard_mix_scout_160_n8 run is also complete at candidate-generation scale:
+- 160 raw problems, 1280 candidates;
+- 43 / 160 mixed problems;
+- mixed-subset oracle reaches 41 / 43 with open_math_prm last aggregation;
+- best single expert reaches 35 / 43;
+- best static calibrated mixture reaches 38 / 43.
+
 Decision:
-1. use min aggregation for the cached open_math_prm step rewards;
+1. keep open_math_prm step aggregation as an ablation; min was best on
+   hard_dev_100_n8, but last is better on hard_mix_scout_160_n8;
 2. keep rank normalization as the default and minmax as a sensitivity check;
-3. do not train the main gate yet;
-4. first build a larger mixed-rich scout split with more MATH500 and no/even
-   fewer easy GSM8K examples.
+3. do not train the final gate on only 43 mixed examples;
+4. expand the same mixed-rich recipe to about 240 raw problems, or add roughly
+   80 raw problems, targeting 60+ mixed examples.
 ```
 
 ## Main Claim Boundary
