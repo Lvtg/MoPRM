@@ -1986,3 +1986,192 @@ Keep these as ablations/diagnostics:
 - open_math_prm min aggregation for static calibration
 - aggregation-as-pseudo-experts oracle/headroom diagnostic
 ```
+
+## 2026-09-04: Candidate Gate-v2 Win/Loss Analysis
+
+Goal:
+
+```text
+Inspect where Candidate Gate-v2 gains or loses relative to the strongest
+baselines at selection level, not only aggregate accuracy.
+```
+
+Implementation added:
+
+```text
+scripts/analyze_candidate_gate_wins.py
+- compares a candidate_gate output against default baselines, best single expert,
+  optional CV-static metadata gate output, and expert oracle;
+- reports wins/losses/both-correct/both-wrong/same-selection/different-selection
+  by all/math/logic/source groups;
+- prints representative win/loss cases with candidate correctness strings and
+  each expert's top candidate.
+
+tests/test_candidate_gate_wins.py
+- verifies win/loss accounting on a synthetic example.
+```
+
+Verification:
+
+```text
+python -m unittest tests.test_candidate_gate_wins
+1 test OK
+```
+
+Main command against the same-aggregation CV-static baseline:
+
+```bash
+python scripts/analyze_candidate_gate_wins.py \
+  --input data/scored/candidate_gate_v2_l2_02/candidate_gate_v2_cv_mean_rank.jsonl \
+  --static-input data/scored/candidate_gate_v2_l2_02/cv_static_calibrated_mean_rank.jsonl \
+  --normalization rank \
+  --case-baseline best_single \
+  --max-cases 20
+```
+
+Method summary:
+
+```text
+Candidate Gate-v2:           72 / 84 = 0.857
+best single open_reasoning:  67 / 84 = 0.798
+CV-static, mean aggregation: 67 / 84 = 0.798
+uniform ensemble:            64 / 84 = 0.762
+OpenAI LLM gate:             60 / 84 = 0.714
+domain-rule gate:            56 / 84 = 0.667
+expert oracle:               76 / 84 = 0.905
+```
+
+Win/loss summary:
+
+```text
+Candidate Gate-v2 vs best single open_reasoning_rm:
+overall: 9 wins, 4 losses, net +5
+math:    9 wins, 3 losses, net +6
+logic:   0 wins, 1 loss,  net -1
+
+Candidate Gate-v2 vs same-aggregation CV-static:
+overall: 9 wins, 4 losses, net +5
+math:    9 wins, 3 losses, net +6
+logic:   0 wins, 1 loss,  net -1
+
+Candidate Gate-v2 vs uniform ensemble:
+overall: 12 wins, 4 losses, net +8
+math:    12 wins, 3 losses, net +9
+logic:   0 wins, 1 loss,  net -1
+
+Candidate Gate-v2 vs OpenAI LLM gate:
+overall: 16 wins, 4 losses, net +12
+math:    16 wins, 3 losses, net +13
+logic:   0 wins, 1 loss,  net -1
+
+Candidate Gate-v2 vs domain-rule gate:
+overall: 21 wins, 5 losses, net +16
+math:    21 wins, 4 losses, net +17
+logic:   0 wins, 1 loss,  net -1
+```
+
+Direct comparison against the previously strongest CV-static setting:
+
+```bash
+python scripts/analyze_candidate_gate_wins.py \
+  --input data/scored/candidate_gate_v2_l2_02/candidate_gate_v2_cv_mean_rank.jsonl \
+  --static-input data/scored/candidate_gate_v2_l2_02/cv_static_calibrated_min_rank.jsonl \
+  --normalization rank \
+  --case-baseline cv_static_calibrated \
+  --max-cases 20
+```
+
+Result:
+
+```text
+Candidate Gate-v2, mean aggregation:       72 / 84 = 0.857
+strongest CV-static, min aggregation:      69 / 84 = 0.821
+
+overall: 8 wins, 5 losses, net +3
+math:    8 wins, 4 losses, net +4
+logic:   0 wins, 1 loss,  net -1
+```
+
+Wins versus best single open_reasoning_rm:
+
+```text
+math500_0018  truths=CWWWWWWW
+math500_0030  truths=WCCCCWCC
+math500_0046  truths=CWWCCCCC
+math500_0048  truths=CWWWWWCW
+math500_0165  truths=WWCCWWWW
+math500_0323  truths=WWWWWWWC
+math500_0389  truths=WWWWWWCW
+math500_0441  truths=WWWWWCWC
+math500_0499  truths=CCWWWCCC
+```
+
+Losses versus best single open_reasoning_rm:
+
+```text
+bbh_logical_deduction_seven_objects_0077  truths=CCWWWWWW
+math500_0034                              truths=WCWWCWWW
+math500_0095                              truths=WCWWWCCW
+math500_0364                              truths=WCWWWWCC
+```
+
+Wins versus strongest CV-static min aggregation:
+
+```text
+math500_0018  truths=CWWWWWWW
+math500_0030  truths=WCCCCWCC
+math500_0048  truths=CWWWWWCW
+math500_0165  truths=WWCCWWWW
+math500_0323  truths=WWWWWWWC
+math500_0328  truths=WWWWCWWW
+math500_0389  truths=WWWWWWCW
+math500_0441  truths=WWWWWCWC
+```
+
+Losses versus strongest CV-static min aggregation:
+
+```text
+bbh_logical_deduction_seven_objects_0077  truths=CCWWWWWW
+math500_0034                              truths=WCWWCWWW
+math500_0095                              truths=WCWWWCCW
+math500_0334                              truths=WCCCCCWW
+math500_0364                              truths=WCWWWWCC
+```
+
+Expert-oracle comparison:
+
+```text
+Candidate Gate-v2: 72 / 84
+expert oracle:     76 / 84
+
+V2 beats expert oracle on 4 problems and loses to it on 8 problems.
+Net gap: -4.
+```
+
+Important nuance:
+
+```text
+The oracle here is the existing expert-oracle gate, not a candidate oracle. It
+can still select a wrong candidate when multiple oracle-successful experts are
+combined and their scores conflict. Therefore Candidate Gate-v2 can beat this
+expert oracle on a few cases, even though it remains below oracle overall.
+```
+
+Interpretation:
+
+```text
+The positive effect is strongly concentrated in MATH500 mixed cases. Candidate
+Gate-v2 often recovers problems where open_reasoning_rm or static calibration
+selects a wrong candidate with high reward-model confidence. The method's main
+failure mode is over-trusting OpenAI judge-style score patterns in one BBH logic
+case and still missing several math cases where the correct candidate is
+available but expert scores are misleading.
+
+This gives a clean error-analysis story:
+- V2 is not simply copying the best expert, because it differs from
+  open_reasoning_rm on 62 / 84 selections;
+- the net gain over strong baselines comes from candidate-level score-pattern
+  learning on math;
+- the next robustness step should test whether this math gain persists on a
+  fresh mixed split.
+```

@@ -394,6 +394,47 @@ four as separate experts makes the current 84-problem training set too small for
 a stable learned gate. For the current main table, use `open_math_prm` mean
 aggregation with Candidate Gate-v2.
 
+### Gate-v2 Win/Loss Analysis
+
+Command:
+
+```bash
+python scripts/analyze_candidate_gate_wins.py \
+  --input data/scored/candidate_gate_v2_l2_02/candidate_gate_v2_cv_mean_rank.jsonl \
+  --static-input data/scored/candidate_gate_v2_l2_02/cv_static_calibrated_min_rank.jsonl \
+  --normalization rank \
+  --case-baseline cv_static_calibrated
+```
+
+Selection-level summary:
+
+```text
+Candidate Gate-v2 vs best single open_reasoning_rm:
+overall: 9 wins, 4 losses, net +5
+math:    9 wins, 3 losses, net +6
+logic:   0 wins, 1 loss,  net -1
+
+Candidate Gate-v2 vs strongest CV-static calibration:
+overall: 8 wins, 5 losses, net +3
+math:    8 wins, 4 losses, net +4
+logic:   0 wins, 1 loss,  net -1
+
+Candidate Gate-v2 vs uniform ensemble:
+overall: 12 wins, 4 losses, net +8
+
+Candidate Gate-v2 vs OpenAI LLM gate:
+overall: 16 wins, 4 losses, net +12
+
+Candidate Gate-v2 vs domain-rule gate:
+overall: 21 wins, 5 losses, net +16
+```
+
+Interpretation: the V2 gain is almost entirely from MATH500 mixed examples. It
+rescues many math problems where `open_reasoning_rm` or static calibration pick
+a confidently wrong candidate. The main cost is one BBH logic case where
+`open_reasoning_rm` was correct but V2 trusted OpenAI judge-style signals too
+much.
+
 ## Next Step
 
 Current decision after Gate-v2:
