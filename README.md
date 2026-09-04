@@ -435,6 +435,33 @@ a confidently wrong candidate. The main cost is one BBH logic case where
 `open_reasoning_rm` was correct but V2 trusted OpenAI judge-style signals too
 much.
 
+### Three-Expert No-RM Ablation
+
+Because `open_reasoning_rm` is the strongest single expert in the four-expert
+pool, we ran a diagnostic ablation that removes it and keeps only
+`open_math_prm`, `openai_general_judge`, and `openai_reflective_judge`.
+
+Detailed note:
+[notes/three_expert_no_reasoning_rm_ablation.md](notes/three_expert_no_reasoning_rm_ablation.md)
+
+Key result:
+
+```text
+without open_reasoning_rm, mean aggregation + rank normalization:
+
+Candidate Gate-v2:          74 / 84 = 0.881
+best single expert:         66 / 84 = 0.786  # openai_reflective_judge
+CV-static calibration:      64 / 84 = 0.762
+uniform ensemble:           62 / 84 = 0.738
+expert top-choice oracle:   73 / 84 = 0.869
+```
+
+Interpretation: `open_reasoning_rm` is indeed very strong, but the V2 gain does
+not vanish when it is removed. The remaining three experts still contain
+accuracy-relevant complementarity, especially on MATH500 mixed examples. This
+should be reported as an ablation rather than the main method, since the no-RM
+pool relies more heavily on the two OpenAI judge experts.
+
 ## Next Step
 
 Current decision after Gate-v2:
