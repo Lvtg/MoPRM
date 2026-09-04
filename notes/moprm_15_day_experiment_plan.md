@@ -19,14 +19,15 @@ Updated goal after the September 1 discussion:
 - The target expert pool is: one open-source math PRM, one open-source logic/reasoning PRM or RM, one OpenAI general judge, and one OpenAI reflective judge.
 - The main claim should depend on heterogeneity: routing is useful because different independently sourced experts specialize in different reasoning patterns.
 
-Current update after the September 3 integration:
+Current update after the September 4 mixed/calibration analysis:
 
 - Two non-OpenAI experts are now integrated: `open_math_prm` and
   `open_reasoning_rm`.
 - The first main heterogeneous pool has been evaluated on `dev_40, N=4`.
 - The first harder `hard_dev_100, N=8` run is complete.
-- The next priority is not blind gate training yet; first analyze mixed-candidate
-  problems and calibrate `open_math_prm` aggregation.
+- The mixed-candidate and calibration analysis is complete.
+- The next priority is a larger mixed-rich scout split, not blind trained-gate
+  fitting.
 
 Relation to our earlier discussions:
 
@@ -225,13 +226,31 @@ oracle_gate:      72 / 100
 Conclusion:
 
 ```text
-The split is harder, but the current expert-oracle gap remains small. The next
-main work should be mixed-candidate analysis and aggregation/calibration before
-trained gate claims.
+The split is harder, but the current expert-oracle gap remains small. Mixed and
+calibration analysis confirms that the next main work should be a larger
+mixed-rich scout split before trained gate claims.
 ```
 
 For reporting, treat mean aggregation as an ablation and min aggregation as the
 current preferred `open_math_prm` configuration.
+
+Mixed/calibration sweep result:
+
+```text
+full split:
+best single expert:             71 / 100  # open_reasoning_rm
+best static calibrated mixture: 72 / 100
+expert oracle:                  72 / 100
+
+mixed subset:
+mixed problems:                 18 / 100
+best single expert:             12 / 18
+best static calibrated mixture: 13 / 18
+expert oracle:                  13 / 18
+
+best static mixture across rank/minmax/zscore:
+open_math_prm(min) + openai_reflective_judge
+```
 
 ## 4. Gate Design
 
@@ -576,10 +595,10 @@ Deliverables:
 
 Revision:
 
-```text
-Before building the trained-gate dataset, run hard_dev_100_n8 and verify:
+Before building the trained-gate dataset, run `hard_dev_100_n8` and verify:
+
 - enough problems have mixed correct/wrong candidates;
-- oracle_gate is meaningfully above best single expert/domain-rule gate;
+- `oracle_gate` is meaningfully above best single expert/domain-rule gate;
 - experts disagree for accuracy-relevant reasons, not only tie-breaking among
   all-correct candidates.
 
@@ -590,15 +609,7 @@ hard_dev_100_n8 has only 18 mixed problems, and expert-oracle is only 1-2
 points above strong baselines depending on aggregation.
 ```
 
-Therefore Day 9 should first build and analyze a mixed-candidate subset:
-
-```text
-include only problems with 1..N-1 correct candidates;
-report PRM@8 on this subset separately from the full split;
-use it to decide whether trained gate labels are meaningful.
-```
-
-Initial mixed-subset result after min aggregation:
+Mixed-subset result after min aggregation:
 
 ```text
 mixed problems: 18 / 100
@@ -608,62 +619,83 @@ openai_llm_gate:  11 / 18
 best single:      12 / 18
 oracle_gate:      13 / 18
 ```
+
+Day 9 decision:
+
+```text
+Do not use the current 18 mixed problems as the main trained-gate dataset.
+They are useful for diagnostics, but too small for a convincing router claim.
+Move to a larger mixed-rich scout split.
 ```
 
-### Day 10: LLM Gate Baseline on Heterogeneous Experts
+### Day 10: Mixed-Rich Scout Split
 
 Goals:
 
-- implement prompt-based LLM gate;
-- compare JSON weights versus domain-rule routing;
-- test top-1 and top-2 routing.
+- expand public subsets, especially MATH500;
+- generate a larger `N=8` scout run with eight distinct candidate styles;
+- filter problems with 1..7 correct candidates;
+- check whether the mixed subset reaches roughly 60+ problems.
 
 Deliverables:
 
-- LLM gate result table;
-- prompt and parsing script;
-- failure examples.
+- `hard_mix_scout_160` split;
+- labeled candidate file;
+- mixed-only split;
+- source and correct-count histogram.
 
-### Day 11: Trained Gate
+Recommended command target:
+
+```text
+prepare MATH500=500, GSM8K=40, BBH per task=100;
+sample 120 MATH500 + 40 BBH seven-object examples;
+generate N=8 candidates at temperature around 1.05;
+filter to records with 1..7 correct candidates.
+```
+
+### Day 11: Score and Analyze Mixed-Rich Split
 
 Goals:
 
-- train question-only lightweight gate;
-- tune on validation split;
-- evaluate on held-out split.
+- score the mixed-rich split with all four experts;
+- run `open_math_prm` aggregation sweep;
+- compare rank/minmax/zscore normalization;
+- estimate oracle gap versus best single/uniform/domain-rule routing.
 
 Deliverables:
 
-- trained gate checkpoint;
-- main result table v1.
+- full and mixed-only result tables;
+- calibration sweep table;
+- expert complementarity diagnostics;
+- decision on whether gate training is justified.
 
-### Day 12: Main Experiment Run
+### Day 12: Trained Gate, Conditional
 
 Goals:
 
-- run full selected dataset;
-- compare all methods under the same candidate set;
-- produce `PRM@8`, and `PRM@16` if possible.
+- train question-only lightweight gate only if the mixed-rich split has enough
+  expert complementarity and oracle headroom;
+- otherwise revise candidate generation or increase `N`.
 
 Deliverables:
 
-- main result table;
-- per-domain result table;
-- saved experiment logs.
+- trained gate checkpoint if justified;
+- otherwise a documented negative decision and revised data-generation plan.
 
 Immediate command target:
 
 ```text
-hard_dev_100_n8 completed
+hard_mix_scout_160_n8
 ```
 
-If the mixed-candidate analysis is useful, freeze hard_dev_100_n8 as the main
-course-project scale and train/calibrate on a split of those examples. If not,
-expand only one axis at a time:
+If `hard_mix_scout_160_n8` gives enough mixed examples, freeze it as the main
+course-project scale and train/calibrate on a train/dev split. If not, expand
+only one axis at a time:
 
 ```text
-Option A: hard_dev_120_n8
-Option B: hard_dev_100_n16
+Option A: revise candidate generation styles / temperature
+Option B: hard_mix_scout_240_n8
+Option C: hard_mix_scout_160_n16
 ```
 
 ### Day 13: Ablations

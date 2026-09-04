@@ -18,7 +18,7 @@ The current OpenAI scorer is intentionally treated as an **OpenAI multi-rubric j
 
 ## Current Status
 
-As of 2026-09-03, the main heterogeneous expert pool has been run at
+As of 2026-09-04, the main heterogeneous expert pool has been run at
 `hard_dev_100, N=8` scale:
 
 | Expert name | Source | Score type |
@@ -63,9 +63,23 @@ oracle_gate                   72 / 100 = 0.720
 ```
 
 Interpretation: the harder `N=8` run is much more useful than `dev_40`, but the
-current expert pool still has limited routing headroom. The strongest next step
-is aggregation/calibration and a mixed-candidate analysis split, not blind gate
-training.
+current split still has limited routing headroom. Mixed-candidate and
+calibration analysis shows that we should not train the main gate yet; the next
+experiment should first create a more selection-informative, mixed-rich split.
+
+Latest mixed/calibration finding:
+
+```text
+mixed problems:                  18 / 100
+candidate upper bound:           77 / 100 full, 18 / 18 mixed
+best single expert:              71 / 100 full, 12 / 18 mixed  # open_reasoning_rm
+best calibrated static mixture:  72 / 100 full, 13 / 18 mixed
+best static weights:             open_math_prm + openai_reflective_judge
+```
+
+The current oracle gap is real but small. This is a useful diagnostic result:
+the bottleneck is not merely the gate, but candidate-set composition and expert
+calibration.
 
 ## Current Scope
 
@@ -178,9 +192,9 @@ python scripts/analyze_expert_pool.py --input data/scored/openai_hard_dev100_n8_
 
 ## Next Step
 
-Do not jump straight to trained gate as the main result. First build a small
-analysis split from problems with mixed candidate correctness, because many
-`hard_dev_100_n8` examples are either all-correct or all-wrong:
+Do not jump straight to trained gate as the main result. The mixed-candidate
+analysis shows that many `hard_dev_100_n8` examples are either all-correct or
+all-wrong:
 
 ```text
 overall avg correct candidates/problem: 5.34 / 8
@@ -191,6 +205,38 @@ mixed problems: 18 / 100
 
 The next useful question is: when there is at least one correct and one wrong
 candidate, can MoPRM routing beat `open_reasoning_rm` and uniform fusion?
+
+Current decision:
+
+1. Treat `open_math_prm` with `min` step aggregation as the preferred math PRM
+   setting; keep mean/last/geomean as ablations.
+2. Use rank normalization for the main table and minmax as a calibration
+   sensitivity check.
+3. Build a larger mixed-rich scout split before training a gate.
+4. Future `N=8` candidate generation now uses eight distinct prompt styles
+   instead of four repeated styles.
+
+Recommended next experiment:
+
+```bash
+python scripts/prepare_public_subsets.py --math500-limit 500 --gsm8k-limit 40 --bbh-limit-per-task 100
+
+python scripts/sample_dataset.py \
+  --input data/cache/public_subsets/math_logic_combined.jsonl \
+  --output data/splits/hard_mix_scout_160.jsonl \
+  --source-quota "math|HuggingFaceH4/MATH-500=120" \
+  --source-quota "logic|BIG-Bench-Hard/logical_deduction_seven_objects=40" \
+  --seed 29
+
+python scripts/generate_openai_candidates.py --input data/splits/hard_mix_scout_160.jsonl --output data/candidates/openai_hard_mix_scout160_n8.jsonl --limit 160 --num-candidates 8 --max-output-tokens 512 --temperature 1.05 --concurrency 4 --overwrite
+python scripts/label_candidate_correctness.py --input data/candidates/openai_hard_mix_scout160_n8.jsonl --output data/cache/openai_hard_mix_scout160_n8_labeled.jsonl --overwrite
+python scripts/filter_candidate_mix.py --input data/cache/openai_hard_mix_scout160_n8_labeled.jsonl --output data/splits/hard_mix_scout160_n8_mixed.jsonl --min-correct 1 --max-correct 7 --overwrite
+```
+
+If the mixed subset reaches roughly 60+ problems and the expert oracle remains
+above best-single/uniform routing, then train the question-level gate. If it
+does not, change the candidate generator or increase `N` before spending time on
+gate training.
 
 ## Local Smoke Test
 

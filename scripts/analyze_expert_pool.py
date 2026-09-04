@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 import statistics
 import sys
@@ -65,23 +65,43 @@ def main() -> None:
         if not count_pairs:
             continue
         counts = [correct for correct, _total in count_pairs]
+        candidate_upper_bound = sum(1 for correct, _total in count_pairs if correct > 0)
+        mixed = sum(1 for correct, total in count_pairs if 0 < correct < total)
         print(
             f"{domain:<8} avg_correct_candidates={_fmt(_avg(counts))} "
             f"all_wrong={sum(1 for count in counts if count == 0)} "
-            f"all_correct={sum(1 for correct, total in count_pairs if correct == total)}"
+            f"all_correct={sum(1 for correct, total in count_pairs if correct == total)} "
+            f"mixed={mixed} "
+            f"candidate_upper={candidate_upper_bound}/{len(count_pairs)}"
         )
 
     print("\n[top-choice complementarity]")
     expert_correct = {expert: 0 for expert in experts}
+    success_patterns: Counter[str] = Counter()
+    unique_successes: Counter[str] = Counter()
+    no_expert_success = 0
+    all_expert_success = 0
     all_same = 0
     any_disagreement = 0
     disagreement_cases: list[tuple[str, str, dict[str, str], str]] = []
     for record in normalized_records:
         choices: dict[str, str] = {}
+        success_flags: dict[str, bool] = {}
         for expert in experts:
             selected = select_candidate(record, single_expert_gate(expert)(record, experts))
             choices[expert] = selected.candidate_id
-            expert_correct[expert] += 1 if selected.is_correct else 0
+            success = bool(selected.is_correct)
+            success_flags[expert] = success
+            expert_correct[expert] += 1 if success else 0
+        pattern = "".join("1" if success_flags[expert] else "0" for expert in experts)
+        success_patterns[pattern] += 1
+        successful_experts = [expert for expert in experts if success_flags[expert]]
+        if len(successful_experts) == 1:
+            unique_successes[successful_experts[0]] += 1
+        if not successful_experts:
+            no_expert_success += 1
+        if len(successful_experts) == len(experts):
+            all_expert_success += 1
         if len(set(choices.values())) == 1:
             all_same += 1
         else:
@@ -94,6 +114,13 @@ def main() -> None:
     print(f"any_expert_disagreement={any_disagreement}")
     for expert, correct in expert_correct.items():
         print(f"single:{expert:<24} {correct:>3}/{len(normalized_records)}")
+    print("success_pattern_legend=" + ",".join(experts))
+    for pattern, count in success_patterns.most_common():
+        print(f"pattern:{pattern} count={count}")
+    print(f"all_experts_success={all_expert_success}")
+    print(f"no_expert_success={no_expert_success}")
+    for expert in experts:
+        print(f"unique_success:{expert:<24} {unique_successes[expert]}")
 
     print("\n[gate weights]")
     gate_values: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))

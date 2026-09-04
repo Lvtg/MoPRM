@@ -46,12 +46,18 @@ Next stage:
 ```text
 hard_dev_100_n8 is complete.
 
-Next:
+The mixed-candidate and calibration analysis is complete:
+- only 18 / 100 problems are mixed candidate sets;
+- the best single expert reaches 71 / 100;
+- the best static calibrated mixture reaches 72 / 100;
+- the mixed-subset expert oracle is 13 / 18.
+
+Decision:
 1. use min aggregation for the cached open_math_prm step rewards;
-2. build a mixed-candidate analysis split from problems with 1..N-1 correct
-   candidates;
-3. train/calibrate the gate only if those mixed examples show enough oracle gap
-   and expert complementarity.
+2. keep rank normalization as the default and minmax as a sensitivity check;
+3. do not train the main gate yet;
+4. first build a larger mixed-rich scout split with more MATH500 and no/even
+   fewer easy GSM8K examples.
 ```
 
 ## Main Claim Boundary

@@ -1040,3 +1040,130 @@ Next recommended work:
 4. Consider a more diverse/weaker candidate generator or generation prompt if
    mixed examples remain too rare.
 ```
+
+## 2026-09-04: Mixed Subset and Calibration Sweep
+
+Goal:
+
+```text
+Analyze whether the current hard_dev_100_n8 split has enough selection-relevant
+expert complementarity to justify training a gate.
+```
+
+Code updates:
+
+```text
+scripts/analyze_expert_pool.py
+- now reports candidate upper bound, mixed/all-correct/all-wrong counts, expert
+  success patterns, and unique-success counts.
+
+scripts/sweep_expert_settings.py
+- sweeps open_math_prm step aggregation: mean, min, last, geomean;
+- sweeps score normalization: rank, minmax, zscore;
+- searches in-sample static expert weights as a calibration diagnostic.
+
+src/moprm/candidates/openai_generator.py
+- future N=8 candidate generation now uses eight distinct candidate styles
+  instead of repeating four styles twice.
+```
+
+Mixed-candidate availability after `open_math_prm` min aggregation:
+
+```text
+overall  avg_correct_candidates=5.340 all_wrong=23 all_correct=59 mixed=18 candidate_upper=77/100
+logic    avg_correct_candidates=7.000 all_wrong=3  all_correct=31 mixed=6  candidate_upper=37/40
+math     avg_correct_candidates=4.233 all_wrong=20 all_correct=28 mixed=12 candidate_upper=40/60
+```
+
+Expert top-choice complementarity:
+
+```text
+full split:
+single:open_math_prm             68 / 100
+single:open_reasoning_rm         71 / 100
+single:openai_general_judge      68 / 100
+single:openai_reflective_judge   69 / 100
+
+success patterns, expert order:
+open_math_prm, open_reasoning_rm, openai_general_judge, openai_reflective_judge
+
+1111 count=65
+0000 count=28
+0111 count=3
+1000 count=1
+1100 count=1
+0100 count=1
+1101 count=1
+
+unique_success:open_math_prm            1
+unique_success:open_reasoning_rm        1
+unique_success:openai_general_judge     0
+unique_success:openai_reflective_judge  0
+```
+
+Mixed-only top-choice complementarity:
+
+```text
+mixed problems: 18
+single:open_math_prm              9 / 18
+single:open_reasoning_rm         12 / 18
+single:openai_general_judge       9 / 18
+single:openai_reflective_judge   10 / 18
+expert oracle                    13 / 18
+unique successes total:           2 problems
+```
+
+Aggregation and calibration sweep:
+
+```text
+Best full-split setting:
+open_math_prm aggregation: min
+normalization: rank/minmax/zscore all reach the same oracle ceiling
+best static mixture: 72 / 100
+
+Best mixed-subset setting:
+open_math_prm aggregation: min
+best static mixture: 13 / 18
+
+Best static weights:
+rank:   open_math_prm 0.5 + openai_reflective_judge 0.5
+minmax: open_math_prm 0.4 + openai_reflective_judge 0.6
+zscore: open_math_prm 0.3 + openai_reflective_judge 0.7
+```
+
+Decision:
+
+```text
+Do not train the main gate on hard_dev_100_n8 yet.
+
+Reason:
+- only 18 / 100 problems are mixed;
+- the current expert oracle is only 1 point above domain/uniform and 1 point
+  above the best single expert after calibration;
+- most examples are either all experts succeed or no expert succeeds, so a gate
+  would mostly learn trivial source/domain behavior or tie-breaking.
+
+Next:
+- build a larger mixed-rich scout split;
+- increase MATH500 share and remove/reduce easy GSM8K;
+- use the new eight-style N=8 generator;
+- only train a gate if the mixed subset reaches roughly 60+ problems and keeps
+  a meaningful oracle gap over best-single/uniform.
+```
+
+Recommended next run:
+
+```text
+prepare_public_subsets:
+  MATH500=500, GSM8K=40, BBH per task=100
+
+hard_mix_scout_160:
+  120 MATH500
+   40 BBH logical_deduction_seven_objects
+  N=8
+  temperature around 1.05
+
+success criterion:
+  mixed problems >= about 60
+  expert oracle clearly above best single and uniform routing
+```

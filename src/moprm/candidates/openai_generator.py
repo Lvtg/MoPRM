@@ -36,6 +36,17 @@ End with exactly one final line in this format:
 Final answer: <answer>
 """
 
+CANDIDATE_STYLES = (
+    "Use a direct concise solution path.",
+    "Use a slightly more detailed solution path with a quick sanity check.",
+    "Use an alternative reasoning path if one is natural.",
+    "Use a fast scratchpad-style solution path while still ending cleanly.",
+    "Use a decomposition-first solution path: break the task into small subclaims.",
+    "Use a verification-first solution path: solve, then check constraints or substitute back.",
+    "Use a case-based or enumeration-style solution path when it is natural.",
+    "Use a cautious error-checking solution path that explicitly guards against a common trap.",
+)
+
 
 def build_generation_prompt(record: ProblemRecord, candidate_index: int) -> str:
     domain_hint = {
@@ -45,12 +56,7 @@ def build_generation_prompt(record: ProblemRecord, candidate_index: int) -> str:
             "answer should be the selected option letter."
         ),
     }.get(record.domain, "This is a reasoning problem.")
-    style = [
-        "Use a direct concise solution path.",
-        "Use a slightly more detailed solution path with a quick sanity check.",
-        "Use an alternative reasoning path if one is natural.",
-        "Use a fast scratchpad-style solution path while still ending cleanly.",
-    ][candidate_index % 4]
+    style = CANDIDATE_STYLES[candidate_index % len(CANDIDATE_STYLES)]
 
     return "\n".join(
         [

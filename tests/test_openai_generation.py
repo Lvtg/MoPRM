@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from moprm.candidates.openai_generator import (  # noqa: E402
+    CANDIDATE_STYLES,
     OpenAICandidateConfig,
     build_generation_prompt,
     generate_openai_candidates,
@@ -94,6 +95,32 @@ class OpenAIGenerationTest(unittest.TestCase):
         prompt = build_generation_prompt(record, 0)
         self.assertIn("What is 20 + 22?", prompt)
         self.assertNotIn("SECRET_GOLD", prompt)
+
+    def test_first_eight_generation_prompts_use_distinct_styles(self) -> None:
+        record = ProblemRecord.from_dict(
+            {
+                "problem_id": "p1",
+                "domain": "logic",
+                "problem": "If A is left of B, which option follows?",
+                "answer": "A",
+                "candidates": [],
+            }
+        )
+        prompt_styles = []
+        for index in range(8):
+            prompt = build_generation_prompt(record, index)
+            style_line = next(
+                line for line in prompt.splitlines()
+                if line.startswith("Candidate style:")
+            )
+            prompt_styles.append(style_line.removeprefix("Candidate style: "))
+
+        self.assertEqual(prompt_styles, list(CANDIDATE_STYLES[:8]))
+        self.assertEqual(len(set(prompt_styles)), 8)
+        self.assertIn(
+            "Candidate style: " + CANDIDATE_STYLES[0],
+            build_generation_prompt(record, 8),
+        )
 
     def test_generate_openai_candidates_marks_no_gold_usage(self) -> None:
         record = ProblemRecord.from_dict(
