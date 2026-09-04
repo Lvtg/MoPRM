@@ -23,7 +23,8 @@ As of 2026-09-04, the project has:
 - integrated the main heterogeneous expert pool;
 - run `hard_dev_100, N=8` as the first harder full split;
 - expanded to `hard_mix_scout_320_n8`, producing 84 mixed candidate sets;
-- implemented and evaluated Gate-v1, the first trained question-level router.
+- implemented and evaluated Gate-v1, the first trained question-level router;
+- implemented Candidate-aware Gate-v2, which is the current best trained method.
 
 Main expert pool:
 
@@ -306,19 +307,105 @@ the next research step should make the gate less purely question-level, or give
 it better labels/features, rather than only claiming that a learned gate already
 wins.
 
+## Gate-v2: Candidate-Aware Learned Selector
+
+Implemented on 2026-09-04:
+
+| Component | Choice |
+|---|---|
+| Gate model | candidate-level logistic selector |
+| Features | candidate text statistics + per-expert raw/rank scores + expert top-choice indicators + score margins |
+| Train labels | candidate final-answer correctness, available only in training folds |
+| Split | 5-fold source/domain-stratified split by problem, not by candidate |
+| Evaluation | out-of-fold candidate scores; select highest-scoring candidate per problem |
+
+This version is more candidate-aware than Gate-v1. Gate-v1 predicts one expert
+weight vector per problem; Candidate Gate-v2 predicts a learned score for each
+candidate using the full expert-score pattern available at selection time. It
+does not see the gold answer at inference.
+
+Current main command:
+
+```bash
+python scripts/train_candidate_gate_v2.py \
+  --input data/scored/openai_hard_mix_scout320_n8_mixed_pool_routed.jsonl \
+  --output-dir data/scored/candidate_gate_v2_l2_02 \
+  --math-aggregations mean,min,last,geomean \
+  --normalization rank \
+  --folds 5 \
+  --seed 41 \
+  --epochs 800 \
+  --lr 0.05 \
+  --l2 0.02 \
+  --grid-step 0.1
+```
+
+Main result on `hard_mix_scout_320_n8_mixed`:
+
+```text
+best setting: open_math_prm mean aggregation + rank normalization + l2=0.02
+
+Candidate Gate-v2:         72 / 84 = 0.857
+CV static calibration:     67 / 84 = 0.798
+best single expert:        67 / 84 = 0.798  # open_reasoning_rm
+uniform ensemble:          64 / 84 = 0.762
+domain-rule gate:          56 / 84 = 0.667
+OpenAI LLM gate:           60 / 84 = 0.714
+expert oracle:             76 / 84 = 0.905
+
+math mixed:
+Candidate Gate-v2:         50 / 61 = 0.820
+best single expert:        44 / 61 = 0.721
+expert oracle:             53 / 61 = 0.869
+
+logic mixed:
+Candidate Gate-v2:         22 / 23 = 0.957
+open_reasoning_rm/oracle:  23 / 23 = 1.000
+```
+
+Aggregation result for Candidate Gate-v2:
+
+```text
+mean:     72 / 84 = 0.857  # best for learned candidate selector
+last:     71 / 84 = 0.845
+geomean:  71 / 84 = 0.845
+min:      69 / 84 = 0.821
+```
+
+Normalization check for the best mean aggregation:
+
+```text
+rank:    72 / 84 = 0.857
+minmax:  68 / 84 = 0.810
+zscore:  68 / 84 = 0.810
+```
+
+Aggregation-as-pseudo-experts was also tested by expanding `open_math_prm` into
+`open_math_prm_mean`, `open_math_prm_min`, `open_math_prm_last`, and
+`open_math_prm_geomean`.
+
+```text
+pseudo-expert oracle:      78 / 84 = 0.929
+Candidate Gate-v2:         68 / 84 = 0.810
+```
+
+Interpretation: aggregation variants do add oracle headroom, but exposing all
+four as separate experts makes the current 84-problem training set too small for
+a stable learned gate. For the current main table, use `open_math_prm` mean
+aggregation with Candidate Gate-v2.
+
 ## Next Step
 
-Current decision after Gate-v1:
+Current decision after Gate-v2:
 
-1. Keep Gate-v1 as the trained question-level baseline.
-2. Report `weight_power=4` as the current best Gate-v1 setting and include
-   `weight_power=1/2/8` as a small sharpness ablation if space allows.
-3. Keep `open_math_prm` step aggregation as an ablation; `mean` is best for
-   Gate-v1, while `min` is best for CV static calibration.
-4. Next improve the gate on one axis: add candidate-aware features, train on
-   math-mixed only, or expand to a larger `hard_mix_scout_480_n8` split.
-5. Do not overclaim yet: Gate-v1 beats uniform/domain/LLM routing, but the
-   strongest CV-static mixture is still better.
+1. Use Candidate Gate-v2 as the current main trained MoPRM result.
+2. Report Gate-v1 as the question-level trained baseline.
+3. Use `open_math_prm` mean aggregation for Candidate Gate-v2, while noting that
+   static calibration prefers `min`.
+4. Keep aggregation-as-pseudo-experts as an oracle/headroom diagnostic, not the
+   main method yet.
+5. Next: run robustness on a larger mixed split or build a cleaner held-out
+   split so the `72/84` result is not overfit to one scout sample.
 
 ## Local Smoke Test
 

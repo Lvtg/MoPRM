@@ -44,6 +44,19 @@ def expert_names_for(records: list[ProblemRecord]) -> list[str]:
     return sorted({expert for record in records for expert in record.expert_names()})
 
 
+def maybe_reaggregate_records(
+    records: list[ProblemRecord],
+    *,
+    aggregation: str,
+) -> list[ProblemRecord]:
+    if aggregation in {"none", "identity", "as-is"}:
+        return records
+    return [
+        reaggregate_record(record, expert_name="open_math_prm", aggregation=aggregation)
+        for record in records
+    ]
+
+
 def cross_validated_gate_records(
     records: list[ProblemRecord],
     *,
@@ -57,6 +70,8 @@ def cross_validated_gate_records(
     lr: float,
     l2: float,
     weight_power: float,
+    include_score_features: bool,
+    gate_type: str,
     math_aggregation: str,
 ) -> list[ProblemRecord]:
     fold_indices = stratified_folds(records, folds=folds, seed=seed)
@@ -76,6 +91,7 @@ def cross_validated_gate_records(
             epochs=epochs,
             lr=lr,
             l2=l2,
+            include_score_features=include_score_features,
             seed=seed + fold_no,
         )
         predicted_weights = model.predict_weight_dicts(test_records, weight_power=weight_power)
@@ -85,13 +101,14 @@ def cross_validated_gate_records(
                 gate_name=gate_name,
                 weights=weights,
                 gate_metadata={
-                    "type": "gate_v1_multilabel_logistic",
+                    "type": gate_type,
                     "fold": fold_no,
                     "folds": folds,
                     "train_size": len(train_records),
                     "normalization": normalization,
                     "math_aggregation": math_aggregation,
                     "hash_dim": hash_dim,
+                    "include_score_features": include_score_features,
                     "epochs": epochs,
                     "lr": lr,
                     "l2": l2,
@@ -250,7 +267,7 @@ def print_table(rows: list[dict[str, str]]) -> None:
         "aggregation",
         "group",
         "candidate_upper",
-        "gate_v1_cv",
+        "trained_gate_cv",
         "cv_static",
         "best_single",
         "uniform",
@@ -297,12 +314,22 @@ def main() -> None:
     parser.add_argument("--lr", type=float, default=0.05)
     parser.add_argument("--l2", type=float, default=0.01)
     parser.add_argument(
+        "--include-score-features",
+        action="store_true",
+        help="Enable Gate-v2 candidate-pool score-shape features.",
+    )
+    parser.add_argument(
         "--weight-power",
         type=float,
         default=1.0,
         help="Sharpen predicted expert probabilities before normalizing them into weights.",
     )
     parser.add_argument("--grid-step", type=float, default=0.1)
+    parser.add_argument(
+        "--skip-static",
+        action="store_true",
+        help="Skip cross-validated static calibration, useful for quick gate sweeps.",
+    )
     parser.add_argument(
         "--include-non-mixed",
         action="store_true",
@@ -315,10 +342,10 @@ def main() -> None:
     rows: list[dict[str, str]] = []
 
     for aggregation in parse_csv(args.math_aggregations):
-        aggregated_records = [
-            reaggregate_record(record, expert_name="open_math_prm", aggregation=aggregation)
-            for record in loaded_records
-        ]
+        aggregated_records = maybe_reaggregate_records(
+            loaded_records,
+            aggregation=aggregation,
+        )
         records = aggregated_records if args.include_non_mixed else filter_mixed_records(aggregated_records)
         experts = expert_names_for(records)
         gate_records = cross_validated_gate_records(
@@ -333,24 +360,35 @@ def main() -> None:
             lr=args.lr,
             l2=args.l2,
             weight_power=args.weight_power,
+            include_score_features=args.include_score_features,
+            gate_type=(
+                "gate_v2_score_shape_multilabel_logistic"
+                if args.include_score_features
+                else "gate_v1_multilabel_logistic"
+            ),
             math_aggregation=aggregation,
         )
-        static_records, fold_summaries = cross_validated_static_records(
-            records,
-            gate_name=args.static_gate_name,
-            expert_names=experts,
-            normalization=args.normalization,
-            folds=args.folds,
-            seed=args.seed,
-            grid_step=args.grid_step,
-            math_aggregation=aggregation,
-        )
+        if args.skip_static:
+            static_records = []
+            fold_summaries = []
+        else:
+            static_records, fold_summaries = cross_validated_static_records(
+                records,
+                gate_name=args.static_gate_name,
+                expert_names=experts,
+                normalization=args.normalization,
+                folds=args.folds,
+                seed=args.seed,
+                grid_step=args.grid_step,
+                math_aggregation=aggregation,
+            )
 
         output_path = output_dir / f"{args.gate_name}_{aggregation}_{args.normalization}.jsonl"
         write_jsonl(output_path, (record.to_dict() for record in gate_records))
 
         static_output_path = output_dir / f"{args.static_gate_name}_{aggregation}_{args.normalization}.jsonl"
-        write_jsonl(static_output_path, (record.to_dict() for record in static_records))
+        if not args.skip_static:
+            write_jsonl(static_output_path, (record.to_dict() for record in static_records))
 
         for group in ("all", "math", "logic"):
             base_group = filter_group(records, group)
@@ -361,7 +399,7 @@ def main() -> None:
                     "aggregation": aggregation,
                     "group": group,
                     "candidate_upper": candidate_score(base_group),
-                    "gate_v1_cv": result_score(
+                    "trained_gate_cv": result_score(
                         get_result(
                             gate_group,
                             method=f"metadata_gate:{args.gate_name}",
@@ -369,12 +407,16 @@ def main() -> None:
                             normalization=args.normalization,
                         )
                     ),
-                    "cv_static": result_score(
-                        get_result(
-                            static_group,
-                            method=f"metadata_gate:{args.static_gate_name}",
-                            gate=metadata_gate(args.static_gate_name),
-                            normalization=args.normalization,
+                    "cv_static": (
+                        "SKIP"
+                        if args.skip_static
+                        else result_score(
+                            get_result(
+                                static_group,
+                                method=f"metadata_gate:{args.static_gate_name}",
+                                gate=metadata_gate(args.static_gate_name),
+                                normalization=args.normalization,
+                            )
                         )
                     ),
                     "best_single": best_single_score(base_group, normalization=args.normalization),
@@ -402,17 +444,18 @@ def main() -> None:
                 }
             )
 
-        print(f"Saved Gate-v1 OOF records: {output_path}")
-        print(f"Saved CV-static OOF records: {static_output_path}")
-        print(f"Static CV fold summaries for {aggregation}: {fold_summaries}")
+        print(f"Saved trained-gate OOF records: {output_path}")
+        if not args.skip_static:
+            print(f"Saved CV-static OOF records: {static_output_path}")
+            print(f"Static CV fold summaries for {aggregation}: {fold_summaries}")
 
     print(f"Loaded {len(loaded_records)} records from {args.input}")
     print(f"Evaluated {'all records' if args.include_non_mixed else 'mixed records only'}")
     print(
-        "Gate-v1 config: "
+        "Trained gate config: "
         f"normalization={args.normalization}, folds={args.folds}, "
         f"hash_dim={args.hash_dim}, epochs={args.epochs}, lr={args.lr}, l2={args.l2}"
-        f", weight_power={args.weight_power}"
+        f", include_score_features={args.include_score_features}, weight_power={args.weight_power}"
     )
     print_table(rows)
 

@@ -30,8 +30,10 @@ Current update after the September 4 mixed/calibration analysis:
   mixed filtering, and mixed-subset expert scoring.
 - Gate-v1, a lightweight trained question-level router, is implemented and
   evaluated with 5-fold source/domain-stratified CV on the 84 mixed examples.
-- Gate-v1 is now the trained-router baseline; the next priority is improving
-  beyond question-only routing or expanding data.
+- Candidate-aware Gate-v2 is implemented and currently gives the strongest
+  trained result on the mixed-rich scout split.
+- The next priority is validation on a fresh/larger mixed split and clearer
+  ablations for why candidate-aware routing helps.
 
 Relation to our earlier discussions:
 
@@ -733,6 +735,12 @@ Completed Gate-v1:
 - out-of-fold metadata gate records;
 - comparison against best single, uniform, domain-rule, LLM gate, CV-static
   calibration, and oracle.
+
+Completed Gate-v2:
+- problem-level score-shape Gate-v2, which did not improve over Gate-v1;
+- Candidate Gate-v2, a candidate-level learned selector over expert scores,
+  margins, top-choice indicators, and candidate text statistics;
+- aggregation-as-pseudo-experts diagnostic for open_math_prm.
 ```
 
 Best Gate-v1 result:
@@ -762,15 +770,57 @@ Gate-v1 CV:             63 / 84 = 0.750 under the same aggregation
 Decision:
 
 ```text
-Keep Gate-v1 as the trained baseline. It improves over uniform/domain/LLM
-routing in the best setting, but the next method should improve one axis at a
-time rather than overclaim.
+Keep Gate-v1 as the trained question-level baseline.
+Use Candidate Gate-v2 as the current main trained method.
 
-Option A: Gate-v2 candidate-aware features, including expert score-shape
-Option B: math-only gate on the 61 MATH500 mixed examples
-Option C: aggregation-aware gate, treating open_math_prm aggregation variants
-          as pseudo-experts or predicting aggregation
-Option D: expand to hard_mix_scout_480_n8 if more training data is needed
+Candidate Gate-v2 main setting:
+- open_math_prm aggregation: mean
+- normalization: rank
+- l2: 0.02
+
+Candidate Gate-v2 result:
+- overall mixed: 72 / 84 = 0.857
+- math mixed:    50 / 61 = 0.820
+- logic mixed:   22 / 23 = 0.957
+
+The method beats:
+- best single expert:    67 / 84
+- uniform ensemble:      64 / 84
+- OpenAI LLM gate:       60 / 84
+- best CV-static under the same mean aggregation: 67 / 84
+
+It also beats the previously strongest CV-static setting:
+- open_math_prm min aggregation + static calibration: 69 / 84
+
+Remaining gap:
+- expert oracle under the same mean aggregation: 76 / 84
+```
+
+Aggregation decision:
+
+```text
+For Candidate Gate-v2, use open_math_prm mean aggregation in the main table.
+
+Aggregation sweep:
+- mean:     72 / 84
+- last:     71 / 84
+- geomean:  71 / 84
+- min:      69 / 84
+
+Static calibration still likes min aggregation, so report aggregation as an
+ablation instead of hiding it as a constant.
+```
+
+Next options:
+
+```text
+Option A: run a fresh hard_mix_scout_480_n8 or held-out mixed split to validate
+          Candidate Gate-v2.
+Option B: add math-only analysis on the 61 MATH500 mixed examples.
+Option C: inspect examples won/lost by Candidate Gate-v2 versus best single and
+          CV-static.
+Option D: keep aggregation-as-pseudo-experts as future work; it raises oracle
+          to 78 / 84 but currently hurts learned gate stability.
 ```
 
 ### Day 13: Ablations

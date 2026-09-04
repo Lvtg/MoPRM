@@ -16,6 +16,10 @@ def domain_rule_gate(record: ProblemRecord, expert_names: list[str]) -> dict[str
 
     preferred_by_domain = {
         "math": [
+            "open_math_prm_min",
+            "open_math_prm_last",
+            "open_math_prm_geomean",
+            "open_math_prm_mean",
             "open_math_prm",
             "openai_math_rubric",
             "math_prm",

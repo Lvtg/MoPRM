@@ -60,6 +60,47 @@ def make_two_candidate_record(
     )
 
 
+def make_custom_score_record(
+    problem_id: str,
+    *,
+    first_correct: bool,
+    math_scores: tuple[float, float],
+    logic_scores: tuple[float, float],
+) -> ProblemRecord:
+    return ProblemRecord.from_dict(
+        {
+            "problem_id": problem_id,
+            "domain": "reasoning",
+            "problem": "Choose the better candidate.",
+            "answer": "A",
+            "metadata": {
+                "source": "synthetic/shape",
+                "task_name": "shape",
+            },
+            "candidates": [
+                {
+                    "candidate_id": f"{problem_id}_0",
+                    "solution": "First candidate.",
+                    "is_correct": first_correct,
+                    "expert_scores": {
+                        "math_expert": math_scores[0],
+                        "logic_expert": logic_scores[0],
+                    },
+                },
+                {
+                    "candidate_id": f"{problem_id}_1",
+                    "solution": "Second candidate.",
+                    "is_correct": not first_correct,
+                    "expert_scores": {
+                        "math_expert": math_scores[1],
+                        "logic_expert": logic_scores[1],
+                    },
+                },
+            ],
+        }
+    )
+
+
 class TrainedGateTest(unittest.TestCase):
     def test_feature_config_and_transform_are_stable(self) -> None:
         records = [
@@ -88,6 +129,39 @@ class TrainedGateTest(unittest.TestCase):
         self.assertEqual(first.shape, (2, config.dim))
         self.assertEqual(config.hash_dim, 16)
         self.assertTrue((first == second).all())
+
+    def test_score_shape_features_extend_feature_matrix(self) -> None:
+        records = [
+            make_two_candidate_record(
+                "math_0",
+                domain="math",
+                problem="Compute 2 + 2.",
+                first_correct=True,
+                math_prefers_first=True,
+                logic_prefers_first=False,
+            ),
+            make_two_candidate_record(
+                "logic_0",
+                domain="logic",
+                problem="If A is before B, which item is first?",
+                first_correct=True,
+                math_prefers_first=False,
+                logic_prefers_first=True,
+            ),
+        ]
+
+        v1_config = fit_feature_config(records, hash_dim=16)
+        v2_config = fit_feature_config(
+            records,
+            hash_dim=16,
+            expert_names=["math_expert", "logic_expert"],
+            include_score_features=True,
+        )
+        features = transform_records(records, v2_config)
+
+        self.assertGreater(v2_config.dim, v1_config.dim)
+        self.assertEqual(features.shape, (2, v2_config.dim))
+        self.assertGreater(v2_config.score_shape_dim, 0)
 
     def test_expert_success_targets_follow_single_expert_selection(self) -> None:
         record = make_two_candidate_record(
@@ -163,6 +237,44 @@ class TrainedGateTest(unittest.TestCase):
 
         self.assertAlmostEqual(sum(math_weights.values()), 1.0)
         self.assertAlmostEqual(sum(logic_weights.values()), 1.0)
+        self.assertGreater(math_weights["math_expert"], math_weights["logic_expert"])
+        self.assertGreater(logic_weights["logic_expert"], logic_weights["math_expert"])
+
+    def test_score_shape_gate_can_learn_without_text_difference(self) -> None:
+        records: list[ProblemRecord] = []
+        for index in range(8):
+            records.append(
+                make_custom_score_record(
+                    f"math_shape_{index}",
+                    first_correct=True,
+                    math_scores=(0.95, 0.05),
+                    logic_scores=(0.50, 0.51),
+                )
+            )
+            records.append(
+                make_custom_score_record(
+                    f"logic_shape_{index}",
+                    first_correct=False,
+                    math_scores=(0.51, 0.50),
+                    logic_scores=(0.05, 0.95),
+                )
+            )
+
+        model = train_linear_gate(
+            records,
+            ["math_expert", "logic_expert"],
+            hash_dim=8,
+            include_score_features=True,
+            epochs=200,
+            lr=0.08,
+            l2=0.001,
+            seed=19,
+        )
+        math_weights, logic_weights = model.predict_weight_dicts(
+            [records[0], records[1]],
+            weight_power=2,
+        )
+
         self.assertGreater(math_weights["math_expert"], math_weights["logic_expert"])
         self.assertGreater(logic_weights["logic_expert"], logic_weights["math_expert"])
 

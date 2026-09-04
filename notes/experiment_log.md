@@ -1744,3 +1744,245 @@ Next improvement should be one of:
    separate pseudo-experts or add aggregation choice as a predicted variable;
 4. expand to hard_mix_scout_480_n8 if more training data is needed.
 ```
+
+## 2026-09-04: Gate-v2 Candidate-Aware Experiments
+
+Goal:
+
+```text
+Move beyond the question-only Gate-v1 by giving the trained method access to
+candidate-pool information available at selection time.
+```
+
+Implementation added:
+
+```text
+src/moprm/trained_gate.py
+- extended FeatureConfig with optional score-shape features for problem-level
+  Gate-v2;
+- score-shape features include per-expert score variance, top gaps, top-choice
+  agreement, pairwise score correlations, and consensus statistics.
+
+scripts/train_gate_v2.py
+- thin wrapper around the trained-gate runner with score-shape features enabled.
+
+scripts/expand_math_aggregation_experts.py
+- expands cached open_math_prm step rewards into aggregation-specific
+  pseudo-experts:
+  open_math_prm_mean, open_math_prm_min, open_math_prm_last,
+  open_math_prm_geomean.
+
+src/moprm/candidate_gate.py
+- implements Candidate Gate-v2 as a candidate-level logistic selector;
+- features include candidate text statistics, per-expert raw/normalized scores,
+  per-expert top-candidate indicators, z-scored margins, and top gaps.
+
+scripts/train_candidate_gate_v2.py
+- trains Candidate Gate-v2 with problem-level 5-fold CV;
+- writes out-of-fold candidate scores into
+  record.metadata.candidate_gate_scores.candidate_gate_v2_cv;
+- compares against best single expert, uniform, domain-rule, OpenAI LLM gate,
+  CV-static calibration, and expert oracle.
+
+tests added:
+- tests/test_candidate_gate.py
+- tests/test_expand_math_aggregation_experts.py
+```
+
+Verification:
+
+```text
+python -m unittest discover -s tests
+58 tests OK
+```
+
+### Problem-level score-shape Gate-v2
+
+Command:
+
+```bash
+python scripts/train_gate_v2.py \
+  --input data/scored/openai_hard_mix_scout320_n8_mixed_pool_routed.jsonl \
+  --output-dir data/scored/gate_v2_p4 \
+  --math-aggregations mean,min,last,geomean \
+  --normalization rank \
+  --folds 5 \
+  --seed 41 \
+  --hash-dim 256 \
+  --epochs 800 \
+  --lr 0.05 \
+  --l2 0.01 \
+  --weight-power 4 \
+  --grid-step 0.1
+```
+
+Result:
+
+```text
+Problem-level score-shape Gate-v2 did not materially improve over Gate-v1.
+
+Best setting:
+mean aggregation + rank normalization + weight_power=4
+
+Gate-v2 score-shape:       67 / 84 = 0.798
+Gate-v1 question-only:     67 / 84 = 0.798
+best single expert:        67 / 84 = 0.798
+uniform ensemble:          64 / 84 = 0.762
+OpenAI LLM gate:           60 / 84 = 0.714
+expert oracle:             76 / 84 = 0.905
+```
+
+Interpretation:
+
+```text
+Simply adding problem-level score-shape features is not enough. The gate still
+produces soft, nearly static expert mixtures and does not exploit candidate-level
+differences.
+```
+
+### Aggregation-as-pseudo-experts diagnostic
+
+Command:
+
+```bash
+python scripts/expand_math_aggregation_experts.py \
+  --input data/scored/openai_hard_mix_scout320_n8_mixed_pool_routed.jsonl \
+  --output data/scored/openai_hard_mix_scout320_n8_mixed_pool_routed_math_agg_experts.jsonl \
+  --aggregations mean,min,last,geomean \
+  --overwrite
+```
+
+Result with problem-level score-shape gate:
+
+```text
+expert pool:
+- open_math_prm_mean
+- open_math_prm_min
+- open_math_prm_last
+- open_math_prm_geomean
+- open_reasoning_rm
+- openai_general_judge
+- openai_reflective_judge
+
+expert oracle:             78 / 84 = 0.929
+CV-static calibration:     68 / 84 = 0.810
+problem-level Gate-v2:     65 / 84 = 0.774
+```
+
+Candidate-level Gate-v2 on the same pseudo-expert pool:
+
+```text
+Candidate Gate-v2:         68 / 84 = 0.810
+math mixed:                46 / 61 = 0.754
+logic mixed:               22 / 23 = 0.957
+```
+
+Interpretation:
+
+```text
+Aggregation variants create real oracle headroom, but exposing all four math
+aggregations as separate experts increases the expert space from 4 to 7. With
+only 84 mixed problems, the trained gate becomes less stable. Keep this as a
+diagnostic/future direction, not the current main method.
+```
+
+### Candidate Gate-v2
+
+Main command:
+
+```bash
+python scripts/train_candidate_gate_v2.py \
+  --input data/scored/openai_hard_mix_scout320_n8_mixed_pool_routed.jsonl \
+  --output-dir data/scored/candidate_gate_v2_l2_02 \
+  --math-aggregations mean,min,last,geomean \
+  --normalization rank \
+  --folds 5 \
+  --seed 41 \
+  --epochs 800 \
+  --lr 0.05 \
+  --l2 0.02 \
+  --grid-step 0.1
+```
+
+Best result:
+
+```text
+setting: open_math_prm mean aggregation + rank normalization + l2=0.02
+
+overall mixed:
+Candidate Gate-v2:         72 / 84 = 0.857
+CV static calibration:     67 / 84 = 0.798
+best single expert:        67 / 84 = 0.798  # open_reasoning_rm
+uniform ensemble:          64 / 84 = 0.762
+domain-rule gate:          56 / 84 = 0.667
+OpenAI LLM gate:           60 / 84 = 0.714
+expert oracle:             76 / 84 = 0.905
+
+math mixed:
+Candidate Gate-v2:         50 / 61 = 0.820
+CV static calibration:     44 / 61 = 0.721
+best single expert:        44 / 61 = 0.721  # openai_reflective_judge
+uniform ensemble:          41 / 61 = 0.672
+domain-rule gate:          33 / 61 = 0.541
+OpenAI LLM gate:           37 / 61 = 0.607
+expert oracle:             53 / 61 = 0.869
+
+logic mixed:
+Candidate Gate-v2:         22 / 23 = 0.957
+open_reasoning_rm/oracle:  23 / 23 = 1.000
+```
+
+Aggregation sweep for Candidate Gate-v2 with rank normalization and l2=0.02:
+
+```text
+mean:       72 / 84 = 0.857
+last:       71 / 84 = 0.845
+geomean:    71 / 84 = 0.845
+min:        69 / 84 = 0.821
+```
+
+Regularization sanity sweep for mean aggregation:
+
+```text
+l2=0.001: 69 / 84 = 0.821
+l2=0.005: 71 / 84 = 0.845
+l2=0.020: 72 / 84 = 0.857
+l2=0.050: 70 / 84 = 0.833
+```
+
+Normalization sanity sweep for mean aggregation and l2=0.02:
+
+```text
+rank:       72 / 84 = 0.857
+minmax:     68 / 84 = 0.810
+zscore:     68 / 84 = 0.810
+```
+
+Interpretation:
+
+```text
+Candidate Gate-v2 is now the strongest trained method. The improvement is
+concentrated on MATH500 mixed examples: 50 / 61 versus 44 / 61 for the best
+single expert and 41 / 61 for uniform ensemble.
+
+This is stronger evidence for MoPRM than Gate-v1 because the model uses
+candidate-level expert-score patterns rather than only coarse problem routing.
+The remaining caveat is sample size: this should be validated on a fresh or
+larger mixed split before making a very strong claim.
+```
+
+Decision:
+
+```text
+Use Candidate Gate-v2 as the current main method:
+- open_math_prm aggregation: mean
+- normalization: rank
+- l2: 0.02
+- split: 5-fold source/domain-stratified by problem
+
+Keep these as ablations/diagnostics:
+- Gate-v1 question-only baseline
+- problem-level score-shape Gate-v2 negative result
+- open_math_prm min aggregation for static calibration
+- aggregation-as-pseudo-experts oracle/headroom diagnostic
+```
