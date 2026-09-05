@@ -2354,3 +2354,71 @@ Next recommendation: freeze Gate-v2 as the main method, use label cleanup as an
 important error-analysis result, and prioritize a larger/fresher clean-label
 split if more experimental work is needed.
 ```
+
+## 2026-09-05: Clean-label Three-Expert No-RM Ablation
+
+Detailed note:
+
+```text
+notes/three_expert_no_reasoning_rm_clean_label_ablation.md
+```
+
+Purpose:
+
+```text
+Re-run the three-expert no-RM ablation after conservative label cleanup.
+The earlier no-RM result was useful, but likely overstated routing gain because
+many pre-clean-label errors were answer-checking artifacts.
+```
+
+Setup:
+
+```text
+input: data/scored/openai_hard_mix_scout320_n8_mixed_pool_routed_clean_labels.jsonl
+removed expert: open_reasoning_rm
+remaining experts:
+- open_math_prm
+- openai_general_judge
+- openai_reflective_judge
+```
+
+Clean-label no-RM baselines on original 84:
+
+```text
+single:open_math_prm              58 / 84 = 0.690
+single:openai_general_judge       79 / 84 = 0.940
+single:openai_reflective_judge    79 / 84 = 0.940
+uniform_ensemble                  75 / 84 = 0.893
+domain_rule_gate                  67 / 84 = 0.798
+OpenAI LLM gate                   72 / 84 = 0.857
+expert top-choice oracle          81 / 84 = 0.964
+```
+
+Candidate Gate-v2 no-RM results:
+
+```text
+clean mixed 67, best aggregation = last + rank:
+Candidate Gate-v2:       63 / 67 = 0.940
+best single expert:      62 / 67 = 0.925
+CV-static calibration:   61 / 67 = 0.910
+expert oracle:           66 / 67 = 0.985
+
+all original 84, best aggregation = mean/geomean + rank:
+Candidate Gate-v2:       81 / 84 = 0.964
+best single expert:      79 / 84 = 0.940
+CV-static calibration:   77 / 84 = 0.917
+expert oracle:           81 / 84 = 0.964
+```
+
+Interpretation:
+
+```text
+Removing open_reasoning_rm does not collapse the system: clean-label no-RM
+Candidate Gate-v2 still improves by +1 problem on the clean mixed 67 subset
+and +2 problems on the original 84-example clean-label pool.
+
+However, the effect is much smaller than the pre-clean-label no-RM result
+(74 / 84 vs 66 / 84). The final report should present the clean-label no-RM
+analysis as a robustness ablation, while treating the older result as part of
+the label-cleaning/error-analysis narrative.
+```

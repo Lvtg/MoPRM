@@ -494,10 +494,46 @@ Because `open_reasoning_rm` is the strongest single expert in the four-expert
 pool, we ran a diagnostic ablation that removes it and keeps only
 `open_math_prm`, `openai_general_judge`, and `openai_reflective_judge`.
 
-Detailed note:
+Detailed notes:
+
+[notes/three_expert_no_reasoning_rm_clean_label_ablation.md](notes/three_expert_no_reasoning_rm_clean_label_ablation.md)
+
 [notes/three_expert_no_reasoning_rm_ablation.md](notes/three_expert_no_reasoning_rm_ablation.md)
 
-Key result:
+The original three-expert note used pre-cleanup answer labels. After the
+conservative label cleanup, this ablation was re-run; the clean-label version
+should be treated as the final reporting version.
+
+Clean-label key result:
+
+```text
+without open_reasoning_rm, clean labels:
+
+clean mixed 67, best aggregation = last + rank:
+Candidate Gate-v2:          63 / 67 = 0.940
+best single expert:         62 / 67 = 0.925  # openai_reflective_judge
+CV-static calibration:      61 / 67 = 0.910
+uniform ensemble:           62 / 67 = 0.925
+expert top-choice oracle:   66 / 67 = 0.985
+
+all original 84, best aggregation = mean/geomean + rank:
+Candidate Gate-v2:          81 / 84 = 0.964
+best single expert:         79 / 84 = 0.940  # openai_reflective_judge
+CV-static calibration:      77 / 84 = 0.917
+uniform ensemble:           75 / 84 = 0.893
+expert top-choice oracle:   81 / 84 = 0.964
+```
+
+Interpretation: removing `open_reasoning_rm` does not collapse the system.
+Candidate-aware routing still provides a small positive gain under cleaned
+labels, but the effect is much smaller than the pre-clean-label ablation
+suggested. This means the old no-RM result was directionally useful but
+overstated the routing gain because many old errors were answer-checking
+artifacts.
+
+Pre-clean-label historical result:
+
+[notes/three_expert_no_reasoning_rm_ablation.md](notes/three_expert_no_reasoning_rm_ablation.md)
 
 ```text
 without open_reasoning_rm, mean aggregation + rank normalization:
@@ -509,24 +545,21 @@ uniform ensemble:           62 / 84 = 0.738
 expert top-choice oracle:   73 / 84 = 0.869
 ```
 
-Interpretation: `open_reasoning_rm` is indeed very strong, but the V2 gain does
-not vanish when it is removed. The remaining three experts still contain
-accuracy-relevant complementarity, especially on MATH500 mixed examples. This
-should be reported as an ablation rather than the main method, since the no-RM
-pool relies more heavily on the two OpenAI judge experts.
+This pre-clean-label number should not be used as the main headline, but it is
+useful as part of the label-cleaning narrative.
 
 ## Next Step
 
 Current decision after Gate-v2:
 
-1. Use Candidate Gate-v2 as the current main trained MoPRM result.
+1. Use clean-label Candidate Gate-v2 as the current main trained MoPRM result.
 2. Report Gate-v1 as the question-level trained baseline.
-3. Use `open_math_prm` mean aggregation for Candidate Gate-v2, while noting that
-   static calibration prefers `min`.
-4. Keep aggregation-as-pseudo-experts as an oracle/headroom diagnostic, not the
-   main method yet.
-5. Next: run robustness on a larger mixed split or build a cleaner held-out
-   split so the `72/84` result is not overfit to one scout sample.
+3. Report the clean-label three-expert no-RM analysis as a robustness ablation,
+   not as the main method.
+4. Treat pre-clean-label results as historical/error-analysis evidence, not as
+   final headline numbers.
+5. If more experimental time is available, prioritize a larger clean-label
+   split over additional Gate-v3 complexity.
 
 ## Local Smoke Test
 
