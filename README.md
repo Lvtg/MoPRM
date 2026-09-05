@@ -548,18 +548,81 @@ expert top-choice oracle:   73 / 84 = 0.869
 This pre-clean-label number should not be used as the main headline, but it is
 useful as part of the label-cleaning narrative.
 
+### Two-Open-PRM Clean-label Ablation
+
+To address the opposite concern--that the main result might rely too much on
+OpenAI judge-style experts--we also removed both OpenAI judge experts and kept
+only the two non-OpenAI open-source reward experts:
+
+```text
+open_math_prm
+open_reasoning_rm
+```
+
+Detailed note:
+[notes/open_prm_2expert_clean_label_ablation.md](notes/open_prm_2expert_clean_label_ablation.md)
+
+This ablation uses the cleaned labels from the V2 loss-case audit. The original
+84 mixed records become:
+
+```text
+candidate-mixed records: 67
+all-correct records:     17
+all-wrong records:        0
+```
+
+Key result:
+
+```text
+two open-source experts only, mean/geomean + rank:
+
+clean mixed 67:
+Candidate Gate-v2:        65 / 67 = 0.970
+best single expert:       64 / 67 = 0.955  # open_reasoning_rm
+CV-static calibration:    64 / 67 = 0.955
+expert top-choice oracle: 66 / 67 = 0.985
+
+all original 84:
+Candidate Gate-v2:        83 / 84 = 0.988
+best single expert:       81 / 84 = 0.964  # open_reasoning_rm
+CV-static calibration:    81 / 84 = 0.964
+expert top-choice oracle: 83 / 84 = 0.988
+```
+
+Routing-relevant subset:
+
+```text
+records where at least one open PRM top choice is wrong: 28
+Candidate Gate-v2 on this subset: 27 / 28 = 0.964
+
+pattern 11: 56 / 56
+pattern 01: 25 / 25
+pattern 10:  2 / 2
+pattern 00:  0 / 1
+```
+
+Interpretation: this is the cleanest robustness result so far against the
+OpenAI-judge homogeneity concern. Candidate Gate-v2 still improves over the
+strongest open-source single expert after both OpenAI judge experts are removed,
+and it reaches the two-expert top-choice oracle on the all-84 clean-label
+evaluation. The caveat is that the candidate answers are still OpenAI-generated
+and the clean-label subset is small and close to ceiling.
+
 ## Next Step
 
-Current decision after Gate-v2:
+Current decision after clean-label Gate-v2 and ablations:
 
 1. Use clean-label Candidate Gate-v2 as the current main trained MoPRM result.
 2. Report Gate-v1 as the question-level trained baseline.
-3. Report the clean-label three-expert no-RM analysis as a robustness ablation,
+3. Report the two-open-PRM clean-label analysis as the main robustness ablation
+   against OpenAI judge-expert dependence.
+4. Report the clean-label three-expert no-RM analysis as a secondary ablation,
    not as the main method.
-4. Treat pre-clean-label results as historical/error-analysis evidence, not as
+5. Treat pre-clean-label results as historical/error-analysis evidence, not as
    final headline numbers.
-5. If more experimental time is available, prioritize a larger clean-label
-   split over additional Gate-v3 complexity.
+6. If more experimental time is available, prioritize a larger clean-label
+   split over additional Gate-v3 complexity; if possible, add a non-OpenAI
+   candidate-generation condition.
 
 ## Local Smoke Test
 

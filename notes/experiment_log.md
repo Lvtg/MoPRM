@@ -2355,6 +2355,186 @@ important error-analysis result, and prioritize a larger/fresher clean-label
 split if more experimental work is needed.
 ```
 
+## 2026-09-05: Two-Open-PRM Clean-label Ablation
+
+Goal:
+
+```text
+Remove both OpenAI judge-style experts and test whether Candidate Gate-v2 still
+works with only the two non-OpenAI open-source reward experts.
+```
+
+Motivation:
+
+```text
+The candidate answers are OpenAI-generated, and two experts in the main pool are
+OpenAI judge-style scorers. This ablation tests whether the routing result
+depends on those OpenAI judge experts.
+```
+
+Input:
+
+```text
+data/scored/openai_hard_mix_scout320_n8_mixed_pool_routed_clean_labels.jsonl
+```
+
+Temporary two-expert pool:
+
+```bash
+python scripts/rewrite_expert_pool.py \
+  --input data/scored/openai_hard_mix_scout320_n8_mixed_pool_routed_clean_labels.jsonl \
+  --output data/scored/tmp_open_prm_2expert_clean_labels_mean.jsonl \
+  --drop openai_general_judge \
+  --drop openai_reflective_judge \
+  --overwrite
+```
+
+Retained experts:
+
+```text
+open_math_prm
+open_reasoning_rm
+```
+
+Clean-label pool status:
+
+```text
+all original records:     84
+candidate-mixed records:  67
+all-correct records:      17
+all-wrong records:         0
+
+math records:             61
+logic records:            23
+math candidate-mixed:     44
+logic candidate-mixed:    23
+```
+
+Two-expert baseline with open_math_prm mean aggregation and rank normalization:
+
+```text
+overall:
+single:open_math_prm          58 / 84 = 0.690
+single:open_reasoning_rm      81 / 84 = 0.964
+uniform ensemble              75 / 84 = 0.893
+domain-rule gate              68 / 84 = 0.810
+OpenAI LLM gate               70 / 84 = 0.833
+expert top-choice oracle      83 / 84 = 0.988
+
+math:
+single:open_math_prm          45 / 61 = 0.738
+single:open_reasoning_rm      58 / 61 = 0.951
+expert top-choice oracle      60 / 61 = 0.984
+
+logic:
+single:open_math_prm          13 / 23 = 0.565
+single:open_reasoning_rm      23 / 23 = 1.000
+expert top-choice oracle      23 / 23 = 1.000
+```
+
+Complementarity:
+
+```text
+success pattern legend: open_math_prm, open_reasoning_rm
+
+11 count = 56
+01 count = 25
+10 count = 2
+00 count = 1
+
+unique success:
+open_math_prm       2
+open_reasoning_rm   25
+```
+
+Candidate Gate-v2, clean mixed 67:
+
+```text
+best tested aggregations: mean/last/geomean + rank
+
+Candidate Gate-v2:       65 / 67 = 0.970
+CV static calibration:   64 / 67 = 0.955
+best single expert:      64 / 67 = 0.955  # open_reasoning_rm
+uniform ensemble:        58 / 67 = 0.866
+domain-rule gate:        51 / 67 = 0.761
+OpenAI LLM gate:         53 / 67 = 0.791
+expert oracle:           66 / 67 = 0.985
+
+math:                    42 / 44 = 0.955
+logic:                   23 / 23 = 1.000
+```
+
+Candidate Gate-v2, all original 84 under cleaned labels:
+
+```text
+best tested aggregations: mean/geomean + rank
+
+Candidate Gate-v2:       83 / 84 = 0.988
+CV static calibration:   81 / 84 = 0.964
+best single expert:      81 / 84 = 0.964  # open_reasoning_rm
+uniform ensemble:        75 / 84 = 0.893
+domain-rule gate:        68 / 84 = 0.810
+OpenAI LLM gate:         70 / 84 = 0.833
+expert oracle:           83 / 84 = 0.988
+
+math:                    60 / 61 = 0.984
+logic:                   23 / 23 = 1.000
+```
+
+Win/loss against best single open_reasoning_rm:
+
+```text
+clean mixed 67:
+overall: 1 win, 0 losses, net +1
+math:    1 win, 0 losses, net +1
+logic:   0 wins, 0 losses
+
+all original 84:
+overall: 2 wins, 0 losses, net +2
+math:    2 wins, 0 losses, net +2
+logic:   0 wins, 0 losses
+```
+
+Routing-relevant subset:
+
+```text
+records where at least one open PRM top choice is wrong: 28
+all-84 trained Candidate Gate-v2 on this subset: 27 / 28 = 0.964
+
+pattern 11: 56 / 56
+pattern 01: 25 / 25
+pattern 10:  2 / 2
+pattern 00:  0 / 1
+```
+
+Only all-84 V2 failure:
+
+```text
+math500_0018
+gold: 28
+selected final answer: 152
+candidate truths: CWWWWWWW
+```
+
+Interpretation:
+
+```text
+This is the strongest current robustness ablation against the OpenAI-judge
+homogeneity concern. After removing both OpenAI judge experts, Candidate Gate-v2
+still improves over the strongest open-source single expert and reaches the
+two-expert oracle on the all-84 clean-label evaluation.
+
+Caveat: candidate answers are still OpenAI-generated, and after label cleanup
+the 84-problem subset is small and near ceiling. This result should be used as a
+robustness ablation, not as a claim that the full pipeline is OpenAI-free.
+```
+
+Full note:
+
+```text
+notes/open_prm_2expert_clean_label_ablation.md
+```
+
 ## 2026-09-05: Clean-label Three-Expert No-RM Ablation
 
 Detailed note:

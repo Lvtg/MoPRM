@@ -67,8 +67,16 @@ Decision:
    expert score/rank/margin features;
 4. Candidate Gate-v2 reaches 72 / 84 on hard_mix_scout_320_n8_mixed, beating
    best single, uniform, domain-rule, OpenAI LLM gate, and CV-static calibration;
-5. next work should validate Candidate Gate-v2 on a fresh/larger mixed split and
-   add win/loss analysis against best single and static calibration.
+5. conservative label cleanup showed that the original 72 / 84 V2 result was
+   strongly underestimated by answer-checking noise;
+6. under cleaned labels, Candidate Gate-v2 remains at or above practical
+   baselines, while the clean mixed subset shrinks from 84 to 67 records;
+7. the two-open-PRM ablation removes both OpenAI judge experts and keeps only
+   `open_math_prm` + `open_reasoning_rm`; Candidate Gate-v2 reaches 83 / 84 on
+   all original clean-label records, matching the two-expert top-choice oracle
+   and beating the best open-source single expert at 81 / 84;
+8. next work should validate Candidate Gate-v2 on a fresh/larger clean-label
+   mixed split and, if possible, add a non-OpenAI candidate-generation condition.
 ```
 
 ## Main Claim Boundary
@@ -86,12 +94,17 @@ Current Gate-v2 claim:
 > A candidate-aware trained selector can exploit heterogeneous expert-score
 > patterns and improve mixed-subset PRM@8 over best single expert, uniform
 > ensemble, domain-rule routing, OpenAI LLM routing, and static calibration on
-> the current scout split.
+> the current scout split. Under cleaned labels, the same selector remains
+> competitive with or above practical baselines; in a two-open-PRM ablation it
+> improves over the strongest open-source single expert and reaches the
+> two-expert oracle on all 84 originally mixed records.
 
 Current caveat:
 
 > The main positive result is still from one 84-problem mixed scout subset, so
-> the next step should validate it on a fresh or larger held-out split.
+> the next step should validate it on a fresh or larger held-out split. The
+> two-open-PRM ablation removes OpenAI judge experts, but the candidate answers
+> are still OpenAI-generated.
 
 Claim to avoid:
 
