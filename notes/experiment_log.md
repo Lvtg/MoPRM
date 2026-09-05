@@ -2175,3 +2175,76 @@ This gives a clean error-analysis story:
 - the next robustness step should test whether this math gain persists on a
   fresh mixed split.
 ```
+
+## 2026-09-05: Candidate Gate-v2 Loss Case Audit
+
+Goal:
+
+```text
+Inspect Candidate Gate-v2's own wrong selections and check whether they indicate
+a need for a more expressive Gate-v3.
+```
+
+Full note:
+
+```text
+notes/candidate_gate_v2_loss_cases.md
+```
+
+Summary:
+
+```text
+Candidate Gate-v2 reported accuracy: 72 / 84 = 0.857
+Wrong selections under current labels: 12
+
+wrong-case domain/source distribution:
+math / HuggingFaceH4/MATH-500:                         11
+logic / BIG-Bench-Hard logical_deduction_seven_objects: 1
+
+correct-candidate-count histogram among wrong cases:
+1 correct candidate: 3
+2 correct candidates: 4
+3 correct candidates: 3
+4 correct candidates: 1
+5 correct candidates: 1
+```
+
+Important label finding:
+
+```text
+11 / 12 wrong selections become answer-equivalent to the gold answer under a
+simple loose diagnostic that removes inline LaTeX math delimiters such as
+\(...\) and simple unit suffixes.
+
+This loose diagnostic is not used in the official metric yet. It indicates that
+the current loss set is dominated by answer-normalization artifacts.
+```
+
+Only clearly semantic loss in this audit:
+
+```text
+bbh_logical_deduction_seven_objects_0077
+
+correct candidates: 000, 001
+Candidate Gate-v2 selected: 006, wrong
+
+expert top choices:
+open_math_prm             -> 000, correct
+open_reasoning_rm         -> 001, correct
+openai_general_judge      -> 006, wrong
+openai_reflective_judge   -> 006, wrong
+```
+
+Interpretation:
+
+```text
+Do not train Gate-v3 immediately. The dataset is small and the apparent loss
+set is mostly label-normalization noise. The next best experimental step is to
+improve/audit the answer checker, re-label the existing candidate files, and
+then re-run the same Gate-v2 evaluation.
+
+A problem-text-aware gate remains plausible, but should be treated as a
+low-capacity extension: frozen problem embeddings or LLM-generated problem tags
+plus the existing candidate/expert score features, not end-to-end text encoder
+training on 84 mixed problems.
+```
