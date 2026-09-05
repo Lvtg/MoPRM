@@ -17,6 +17,46 @@ _ANSWER_LINE_RE = re.compile(
 _LATEX_TEXT_RE = re.compile(r"\\text\{([^{}]*)\}")
 _LATEX_FRAC_RE = re.compile(r"\\(?:d?frac)\{([^{}]+)\}\{([^{}]+)\}")
 _LATEX_SQRT_RE = re.compile(r"\\sqrt\{([^{}]+)\}")
+_UNIT_SUFFIXES = (
+    "centimeters",
+    "centimetres",
+    "kilograms",
+    "millimeters",
+    "millimetres",
+    "seconds",
+    "minutes",
+    "degrees",
+    "gallons",
+    "dollars",
+    "meters",
+    "metres",
+    "inches",
+    "pounds",
+    "grams",
+    "hours",
+    "miles",
+    "yards",
+    "units",
+    "feet",
+    "foot",
+    "inch",
+    "mile",
+    "yard",
+    "days",
+    "kgs",
+    "lbs",
+    "day",
+    "sec",
+    "min",
+    "hrs",
+    "cm",
+    "mm",
+    "kg",
+    "lb",
+    "ft",
+    "m",
+    "s",
+)
 
 
 def strip_boxed(text: str) -> str:
@@ -93,6 +133,10 @@ def normalize_latex(answer: str) -> str:
         value = _LATEX_SQRT_RE.sub(r"sqrt(\1)", value)
 
     replacements = {
+        "\\(": "",
+        "\\)": "",
+        "\\[": "",
+        "\\]": "",
         "\\left": "",
         "\\right": "",
         "\\,": "",
@@ -124,8 +168,7 @@ def normalize_answer(answer: str) -> str:
     return value
 
 
-def parse_numeric(answer: str) -> float | None:
-    normalized = normalize_answer(answer)
+def _parse_normalized_numeric(normalized: str) -> float | None:
     if not normalized:
         return None
     normalized = normalized.replace("%", "/100")
@@ -142,6 +185,27 @@ def parse_numeric(answer: str) -> float | None:
         return float(normalized)
     except ValueError:
         return None
+
+
+def _strip_numeric_unit_suffix(normalized: str) -> str:
+    for suffix in _UNIT_SUFFIXES:
+        if not normalized.endswith(suffix):
+            continue
+        stripped = normalized[: -len(suffix)]
+        if stripped and _parse_normalized_numeric(stripped) is not None:
+            return stripped
+    return normalized
+
+
+def parse_numeric(answer: str) -> float | None:
+    normalized = normalize_answer(answer)
+    parsed = _parse_normalized_numeric(normalized)
+    if parsed is not None:
+        return parsed
+    stripped = _strip_numeric_unit_suffix(normalized)
+    if stripped != normalized:
+        return _parse_normalized_numeric(stripped)
+    return None
 
 
 def check_answer(prediction: str, gold: str, domain: str | None = None, tol: float = 1e-6) -> bool:

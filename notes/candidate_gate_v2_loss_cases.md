@@ -147,3 +147,27 @@ The loss audit suggests that further gains should first come from label hygiene,
 not a larger gate model. A problem-text-aware gate can be positioned as future
 work or a small optional diagnostic, rather than the main next experiment.
 ```
+
+## Follow-up
+
+This recommendation was tested in the 2026-09-05 label-cleanup experiment:
+
+```text
+notes/label_cleanup_v2_results.md
+```
+
+After conservative answer-checker cleanup, the old Candidate Gate-v2 selections
+score:
+
+```text
+83 / 84 = 0.988
+```
+
+The retrained all-84 clean-label Candidate Gate-v2 scores:
+
+```text
+82 / 84 = 0.976
+```
+
+This supports the conclusion that label hygiene, not a larger Gate-v3, is the
+right immediate next step.

@@ -52,6 +52,16 @@ class AnswerCheckingTest(unittest.TestCase):
             "(3,pi/2)",
         )
 
+    def test_inline_math_delimiters(self) -> None:
+        self.assertTrue(check_answer(r"\(-125\)", "-125"))
+        self.assertTrue(check_answer(r"\(\frac{2}{3}\)", r"\frac{2}{3}"))
+        self.assertTrue(check_answer(r"\((1, -16, -4, 43)\)", "(1,-16,-4,43)"))
+
+    def test_numeric_unit_suffix(self) -> None:
+        self.assertTrue(check_answer("36 seconds", "36"))
+        self.assertFalse(check_answer("37 seconds", "36"))
+        self.assertFalse(check_answer("36%", "36"))
+
 
 if __name__ == "__main__":
     unittest.main()

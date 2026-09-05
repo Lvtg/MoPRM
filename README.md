@@ -394,6 +394,59 @@ four as separate experts makes the current 84-problem training set too small for
 a stable learned gate. For the current main table, use `open_math_prm` mean
 aggregation with Candidate Gate-v2.
 
+### Clean-label Check
+
+Added on 2026-09-05 after the V2 loss-case audit.
+
+The answer checker now handles conservative formatting artifacts:
+
+- LaTeX inline/display wrappers such as `\(...\)` and `\[...\]`;
+- simple numeric unit suffixes such as `36 seconds` vs `36`;
+- percentage semantics are preserved, so `36%` is not equal to `36`.
+
+Relabeling the 84-problem mixed pool changed 23 records:
+
+```text
+old correct candidate labels: 371 / 672
+new correct candidate labels: 475 / 672
+
+old mixed records: 84
+new mixed records: 67
+new all-correct records: 17
+```
+
+Old Candidate Gate-v2 selections under cleaned labels:
+
+```text
+all original 84 records:
+Candidate Gate-v2:       83 / 84 = 0.988
+best single expert:      81 / 84 = 0.964
+uniform ensemble:        80 / 84 = 0.952
+OpenAI LLM gate:         73 / 84 = 0.869
+expert oracle:           82 / 84 = 0.976
+```
+
+Retrained Candidate Gate-v2 under cleaned labels:
+
+```text
+all original 84 records:
+Candidate Gate-v2:       82 / 84 = 0.976
+CV static calibration:   81 / 84 = 0.964
+best single expert:      81 / 84 = 0.964
+expert oracle:           82 / 84 = 0.976
+
+clean mixed 67 records:
+Candidate Gate-v2:       64 / 67 = 0.955
+CV static calibration:   64 / 67 = 0.955
+best single expert:      64 / 67 = 0.955
+expert oracle:           65 / 67 = 0.970
+```
+
+Interpretation: the earlier `72 / 84` result was strongly underestimated by
+answer-checking noise. After cleanup, the remaining evidence favors keeping
+Candidate Gate-v2 as the main method and expanding to a larger clean-label split
+rather than training a more expressive Gate-v3 immediately.
+
 ### Gate-v2 Win/Loss Analysis
 
 Command:

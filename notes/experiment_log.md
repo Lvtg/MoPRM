@@ -2248,3 +2248,109 @@ low-capacity extension: frozen problem embeddings or LLM-generated problem tags
 plus the existing candidate/expert score features, not end-to-end text encoder
 training on 84 mixed problems.
 ```
+
+## 2026-09-05: Conservative Label Cleanup and Clean-label V2 Effect
+
+Goal:
+
+```text
+Fix obvious automatic answer-checking artifacts found by the V2 loss audit and
+measure Candidate Gate-v2 under cleaned labels.
+```
+
+Implementation:
+
+```text
+src/moprm/answer_checking.py
+- remove LaTeX inline/display math wrappers \(...\) and \[...\];
+- for numeric answers only, ignore simple unit suffixes such as seconds,
+  degrees, units, gallons, etc.;
+- preserve percentage semantics, so 36% is still not equal to 36.
+
+tests/test_answer_checking.py
+- add regression coverage for inline math wrappers, coordinate tuples, simple
+  unit suffixes, and percentage non-equivalence.
+```
+
+Verification:
+
+```text
+python -m unittest discover -s tests
+61 tests OK
+```
+
+Full note:
+
+```text
+notes/label_cleanup_v2_results.md
+```
+
+Label-change summary:
+
+```text
+records:              84
+candidates:           672
+old correct labels:   371 / 672
+new correct labels:   475 / 672
+changed records:      23 / 84
+
+old mixed records:    84
+new mixed records:    67
+new all-correct:      17
+new all-wrong:        0
+```
+
+Old V2 selections under cleaned labels:
+
+```text
+all original 84:
+Candidate Gate-v2:       83 / 84 = 0.988
+best single expert:      81 / 84 = 0.964  # open_reasoning_rm
+uniform ensemble:        80 / 84 = 0.952
+domain-rule gate:        68 / 84 = 0.810
+OpenAI LLM gate:         73 / 84 = 0.869
+expert oracle:           82 / 84 = 0.976
+
+clean mixed 67:
+Candidate Gate-v2:       66 / 67 = 0.985
+best single expert:      64 / 67 = 0.955
+uniform ensemble:        63 / 67 = 0.940
+domain-rule gate:        51 / 67 = 0.761
+OpenAI LLM gate:         56 / 67 = 0.836
+expert oracle:           65 / 67 = 0.970
+```
+
+Retrained V2 under cleaned labels:
+
+```text
+clean mixed 67:
+Candidate Gate-v2:       64 / 67 = 0.955
+CV static calibration:   64 / 67 = 0.955
+best single expert:      64 / 67 = 0.955
+expert oracle:           65 / 67 = 0.970
+
+all original 84:
+Candidate Gate-v2:       82 / 84 = 0.976
+CV static calibration:   81 / 84 = 0.964
+best single expert:      81 / 84 = 0.964
+uniform ensemble:        80 / 84 = 0.952
+OpenAI LLM gate:         73 / 84 = 0.869
+expert oracle:           82 / 84 = 0.976
+```
+
+Interpretation:
+
+```text
+The original 72 / 84 V2 result was strongly underestimated by answer-checking
+noise. After conservative label cleanup, old V2 selections score 83 / 84, while
+the retrained all-84 clean-label V2 scores 82 / 84.
+
+The cleaned mixed subset shrinks from 84 to 67 because 17 examples become
+all-correct. On this smaller/easier subset, retrained V2 ties best single and
+CV-static baselines. Therefore there is no strong evidence that Gate-v3 training
+is necessary right now.
+
+Next recommendation: freeze Gate-v2 as the main method, use label cleanup as an
+important error-analysis result, and prioritize a larger/fresher clean-label
+split if more experimental work is needed.
+```
