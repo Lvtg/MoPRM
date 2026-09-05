@@ -1,5 +1,10 @@
 # MoPRM
 
+> **Latest complete experiment analysis:** start with
+> [notes/complete_experiment_analysis.md](notes/complete_experiment_analysis.md)
+> for the current end-to-end interpretation of all local experiment data,
+> reports, clean-label checks, and ablations.
+
 MoPRM is a course-project experiment on **router-guided mixtures of heterogeneous process reward models** for reasoning tasks.
 
 The project studies whether a lightweight gate can choose or weight multiple independently sourced PRM/verifier experts for different problems and candidate solutions, improving Best-of-N selection compared with any single expert, a naive ensemble, or an OpenAI-only multi-rubric judge baseline.
